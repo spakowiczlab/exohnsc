@@ -7,24 +7,159 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(survival)
+library(survminer)
+library(ggplot2)
+library(tibble)
+library(tidyr)
+
+source("/fs/ess/PAS1695/exoticpipe/R/counts-to-rarefied-prevalence.R")
 ```
 
-## R Markdown
+# Load data
+```{r}
+data.dir <- "/fs/ess/PAS1695/projects/HNSC/data/drake-output/"
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+exora <- read.csv(file.path(data.dir, "tcga_exora-with-taxonomy.csv"), stringsAsFactors = F)
+clin <- read.csv(file.path(data.dir, "tcga_clinical.csv"), stringsAsFactors = F)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+rcounts <- read.table("/fs/ess/PAS1695/generate-inputs/TCGA-processing/data/HNSC/k2bout.txt",
+                      stringsAsFactors = F, header = T, sep = "\t")
 
-```{r cars}
-summary(cars)
 ```
 
-## Including Plots
+# Functions
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+extract_coxph_results <- function(cp.form, int.term.name, dattab){
+    tmp <- coxph(as.formula(cp.form), data = dattab) %>%
+      summary()
+  pvals <- tmp$coefficients %>%
+    as.data.frame() %>%
+    rownames_to_column(var = "term") %>%
+    mutate(p.value = `Pr(>|z|)`) %>%
+    select(term, p.value)
+  conf.int <- tmp$conf.int %>%
+    as.data.frame() %>%
+    rownames_to_column(var = "term") %>%
+    mutate(hazard.ratio = `exp(coef)`,
+           confint.low = `lower .95`,
+           confint.high = `upper .95`) %>%
+    select(term, hazard.ratio, confint.low, confint.high) %>%
+    left_join(pvals) %>%
+    filter(term == int.term.name)
+  return(conf.int)
+}
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# Set up prevalence
+
+I was going to  try to use a prevalence value from the normalized exora data, but the histogram looks a bit weird. Let's work with the raw counts instead.
+```{r try working with exora}
+prev.in <- exora %>%
+  filter(microbe != "Homo.sapiens")
+  
+summary(prev.in$exo.ra)
+
+prev.in %>%
+  ggplot(aes(x = exo.ra)) +
+  geom_histogram() +
+  xlim(c(0, 1e-8))
+```
+
+```{r calculate rarefied prevalence SLOW}
+# This looks like it's from the version of the pipeline that lost samples? we will ignore this I guess. I need to check with Caroline. Instead we'll use the rarefied prevalence on all available samples.
+goodsamps <- intersect(exora$sample, clin$file_id.BAM)
+length(goodsamps)
+
+# prevfun.in <- rcounts %>%
+#   column_to_rownames(var = "sample") %>%
+#   as.matrix()
+# 
+# rarprev <- counts_to_rarefied_prevalenc(prevfun.in)
+
+# Ask CW for write privilege
+# write.csv(rarprev, "/fs/ess/PAS1695/projects/HNSC/data/rarefied-prevalence_all-TCGA-samps.csv",
+#           row.names = F)
+# write.csv(rarprev, "../data/rarefied-prevalence_all-TCGA-samps.csv",
+#           row.names = F)
+
+rarprev <- read.csv("../data/rarefied-prevalence_all-TCGA-samps.csv")
+```
+
+```{r get names of microbes with nonzero prevalence}
+testprev <- colSums(rarprev[,-1])
+microbes <- names(subset(testprev, testprev > 0))
+```
+
+# Object for loop
+
+```{r}
+surv.in <- clin %>%
+  rename("sample" = "file_id.BAM") %>%
+  inner_join(rarprev) %>%
+  mutate(smoking = ifelse(pack_years_smoked >= 10, 1, 0),
+         smoking = ifelse(is.na(smoking), 0, smoking),
+         age = age_at_diagnosis/365.25,
+         days = coalesce(days_to_death, days_to_last_follow_up),
+         vitalstatus = ifelse(vital_status == "Dead", 1, 0),
+         survstage = ifelse(grepl("IV", ajcc_clinical_stage), "Stage IV", ajcc_clinical_stage)) %>%
+  drop_na(days, vitalstatus)
+```
+# Check survival of covariates
+
+Looks like the model is able to work with all of these covariates on their own. I'm a little worried about the stage not being significant though. Let's also check all the covariates together.
+```{r}
+covars <- c("smoking", "age", "survstage")
+
+univ.cov <- lapply(covars, function(x) coxph(as.formula(paste0("Surv(days, vitalstatus) ~ ", x)), data = surv.in))
+names(univ.cov) <- covars
+
+lapply(univ.cov, function(x) summary(x))
+```
+
+```{r}
+test.allcov <- coxph(as.formula(paste0("Surv(days, vitalstatus) ~ ", paste(covars, collapse = " + "))),
+                     data = surv.in)
+summary(test.allcov)
+```
+
+
+# Run survival
+
+```{r get formulas to try}
+covars.string <- paste(covars, collapse = " + ")
+forms <- paste0("Surv(days, vitalstatus) ~ ", microbes, " + ", covars.string)
+names(forms) <- microbes
+```
+
+```{r The big survival calculation}
+multivar.cph.ls <- lapply(microbes, function(x) extract_coxph_results(forms[[x]], x, surv.in))
+multivar.cph <- bind_rows(multivar.cph.ls)
+```
+
+# Make nice tables
+```{r}
+nsamps = nrow(surv.in)
+mics.in.dat <- surv.in %>%
+  select(microbes)
+tally.mics <- colSums(mics.in.dat) %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "term") %>%
+  rename("samples.with.microbe" = ".") %>%
+  mutate(samples.without.microbe = nsamps - samples.with.microbe,
+         pass.prevalence.split = ifelse(samples.without.microbe > 10 & samples.with.microbe > 10, "Yes", "No"))
+```
+
+```{r}
+multivar.withns <- multivar.cph %>%
+  mutate(padj.FDR = p.adjust(p.value, "fdr")) %>%
+  left_join(tally.mics) %>%
+  arrange(desc(pass.prevalence.split), p.value)
+```
+
+```{r}
+write.csv(multivar.withns, "../data/survival_multivar-microbes.csv", row.names = F)
+```
