@@ -38,6 +38,9 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
+# Large files
+rarefied-prevalence_all-TCGA-samps.csv
+
 # paths description files
 exohnsc.json
 scripts/00-paths.R
