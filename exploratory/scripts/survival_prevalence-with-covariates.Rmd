@@ -20,10 +20,10 @@ source("/fs/ess/PAS1695/exoticpipe/R/counts-to-rarefied-prevalence.R")
 
 # Load data
 ```{r}
-data.dir <- "/fs/ess/PAS1695/projects/HNSC/data/drake-output/"
+data.dir <- "/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-15-2021"
 
-exora <- read.csv(file.path(data.dir, "tcga_exora-with-taxonomy.csv"), stringsAsFactors = F)
-clin <- read.csv(file.path(data.dir, "tcga_clinical.csv"), stringsAsFactors = F)
+exora <- read.csv(file.path(data.dir, "7-15-2021_tcga_exora-with-taxonomy.csv"), stringsAsFactors = F)
+clin <- read.csv(file.path(data.dir, "7-15-2021_tcga_clinical.csv"), stringsAsFactors = F)
 
 rcounts <- read.table("/fs/ess/PAS1695/generate-inputs/TCGA-processing/data/HNSC/k2bout.txt",
                       stringsAsFactors = F, header = T, sep = "\t")
