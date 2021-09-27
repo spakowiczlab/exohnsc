@@ -163,3 +163,21 @@ multivar.withns <- multivar.cph %>%
 ```{r}
 write.csv(multivar.withns, "../data/survival_multivar-microbes.csv", row.names = F)
 ```
+
+# Aggregating Alphapappilomavirus
+
+```{r}
+test <- colnames(rarprev)
+test[grep("Alphapap", test)]
+
+to.agg <- paste0("Alphapapillomavirus.", c(5,6,9,7,11))
+
+agg.prev <- rarprev %>%
+  dplyr::select('sample', to.agg) %>%
+  gather(-sample, key = "contributor", value = "prev") %>%
+  group_by(sample) %>%
+  summarise(HPV.prev = max(prev))
+
+table(agg.prev$HPV.prev)
+write.csv(agg.prev, "../data/HPV-prevalence-per-sample.csv", row.names = F)
+```
