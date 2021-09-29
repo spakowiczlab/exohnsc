@@ -1,0 +1,134 @@
+---
+title: "2021 SITC poster"
+author: "Rebecca Hoyd"
+date: "9/27/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(ggplot2)
+library(tibble)
+library(tidyr)
+library(Hmisc)
+library(ggforce)
+library(forcats)
+library(viridis)
+library(stringr)
+```
+
+# Load data
+
+```{r}
+surv.res <- read.csv("../data/survival_multivar-microbes.csv", stringsAsFactors = F)
+
+data.dir <- "/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-15-2021"
+# exora <- read.csv(file.path(data.dir, "7-15-2021_tcga_exora-with-taxonomy.csv"), stringsAsFactors = F)
+```
+
+```{r}
+krakenmet <- read.delim("/fs/ess/PAS1695/exoticpipe/external-data/kraken2-metaphlan-taxonomy.txt",
+                         header = F, stringsAsFactors = F) %>%
+    rename("Taxonomy" = "V1")
+```
+
+```{r}
+assign_taxonomy <- function(met.all, exo.obj){
+  met.good <- met.all %>%
+    dplyr::filter(!grepl("\n", Taxonomy))
+  met.fix <- met.all %>%
+    dplyr::filter(grepl("\n", Taxonomy)) 
+  
+  fix.taxa.amalgam <- paste(met.fix$Taxonomy, collapse = "\n")
+  fix.taxa.split <- str_split(pattern = "\n", fix.taxa.amalgam)[[1]]
+  met.repared <- as.data.frame(cbind(Taxonomy = fix.taxa.split,
+                                     V2 = 1))%>%
+    tidyr::separate(Taxonomy, into = c("Taxonomy"), sep = "\t") %>%
+    mutate(V2 = as.numeric(as.character(V2)))
+  
+  taxkey <- bind_rows(met.good, met.repared) %>%
+    dplyr::filter(grepl("s__", Taxonomy)) %>%
+    mutate(specjoin = gsub(".*s__(.*)", "\\1", Taxonomy),
+           specjoin = make.names(specjoin))
+  
+  exo.obj.tax <- exo.obj %>%
+    mutate(specjoin = microbe)%>%
+    left_join(taxkey) %>%
+    mutate(domain = gsub("(d__\\w+).*", "\\1", Taxonomy),
+           kingdom = ifelse(grepl("k__", Taxonomy),gsub(".*(k__\\w+).*", "\\1", Taxonomy), NA),
+           phylum = ifelse(grepl("p__", Taxonomy),gsub(".*(p__\\w+).*", "\\1", Taxonomy), NA),
+           order = ifelse(grepl("o__", Taxonomy),gsub(".*(o__\\w+).*", "\\1", Taxonomy), NA),
+           class = ifelse(grepl("c__", Taxonomy),gsub(".*(c__\\w+).*", "\\1", Taxonomy), NA),
+           family = ifelse(grepl("f__", Taxonomy),gsub(".*(f__\\w+).*", "\\1", Taxonomy), NA),
+           genus = ifelse(grepl("g__", Taxonomy),gsub(".*(g__\\w+).*", "\\1", Taxonomy), NA),
+           species = gsub(".*(s__.*)", "\\1", Taxonomy)
+    ) %>%
+    mutate(genus = ifelse(is.na(genus), paste0("g__unclassified-", species), genus),
+           family = ifelse(is.na(family), paste0("f__unclassified-", gsub("g__unclassified-", "", genus)), family),
+           order = ifelse(is.na(order), paste0("o__unclassified-", gsub("f__unclassified-", "", family)), order),
+           class = ifelse(is.na(class), paste0("c__unclassified-", gsub("o__unclassified-", "", order)), class),
+           phylum = ifelse(is.na(phylum), paste0("p__unclassified-", gsub("c__unclassified-", "", class)),phylum),
+           kingdom = ifelse(is.na(kingdom), paste0("k__unclassified-", gsub("p__unclassified-", "", phylum)), kingdom),
+           domain = ifelse(is.na(domain), paste0("d__unclassified-", gsub("k__unclassified-", "", kingdom)), domain)) %>%
+    dplyr::select(-V2)
+  
+  return(exo.obj.tax)
+  
+}
+```
+
+# Format for forest
+
+```{r}
+k2tax <- unique(exora[, c( "microbe", "domain", "kingdom", "phylum", "class", "order", "family", "genus", "species")])
+
+surv.baseform <- surv.res %>%
+  arrange(desc(hazard.ratio)) %>%
+  mutate(nlogpval = -log(p.value),
+         microbe = term) %>%
+  dplyr::filter(confint.high < Inf | confint.low > 0)%>%
+  assign_taxonomy(krakenmet, .)
+hr.ord <- surv.baseform$term
+table(surv.baseform$domain)
+```
+
+# Taxonomy forest
+
+```{r}
+surv.baseform %>%
+  # dplyr::filter(!is.na(hazard.ratio)) %>%
+  ggplot(aes(x = fct_relevel(microbe, hr.ord), y = hazard.ratio,
+             # ymin = confint.low, ymax = confint.high,
+             color = p.value)) +
+  facet_row(vars(domain), scales = "free_x", space = "free") +
+  geom_point() +
+  labs(x = "", y = "Hazard ratio") + 
+  scale_colour_viridis_c(guide = "legend", breaks = c(0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.1, 0.2, 0.5, 1),
+                       limits = c(0, 1), values = c(0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.1, 0.2, 0.5, 1),
+                       labels = c("<0.01", "0.01", "0.02","0.03", "0.04","0.05","0.1", "0.2", "0.5", "1")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggsave("../figures/forest_all-coxph-results_facet-domain.png", width = 20)
+```
+# HR+pval forest
+
+```{r}
+surv.baseform %>%
+  # dplyr::filter(!is.na(hazard.ratio)) %>%
+  ggplot(aes(x = fct_relevel(microbe, hr.ord), y = hazard.ratio,
+             # ymin = confint.low, ymax = confint.high,
+             color = p.value)) +
+  # geom_pointrange() +
+  geom_point() +
+  labs(x = "", y = "Hazard ratio") + 
+  scale_colour_viridis_c(guide = "legend", breaks = c(0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.1, 0.2, 0.5, 1),
+                       limits = c(0, 1), values = c(0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.1, 0.2, 0.5, 1),
+                       labels = c("<0.01", "0.01", "0.02","0.03", "0.04","0.05","0.1", "0.2", "0.5", "1")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggsave("../figures/forest_all-coxph-results.png", width = 20)
+```
+
+# Co-abundance forest

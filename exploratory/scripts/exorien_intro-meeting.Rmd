@@ -17,8 +17,6 @@ library(tidyr)
 library(Hmisc)
 library(ggforce)
 library(forcats)
-
-source("/fs/ess/PAS1695/exoticpipe/R/counts-to-rarefied-prevalence.R")
 ```
 
 # Functions
@@ -95,7 +93,7 @@ data.dir <- "/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-15-2021"
 clin <- read.csv(file.path(data.dir, "7-15-2021_tcga_clinical.csv"), stringsAsFactors = F)
 exora <- read.csv(file.path(data.dir, "7-15-2021_tcga_exora-with-taxonomy.csv"), stringsAsFactors = F)
 
-rarprev <- read.table("../data/rarefied-prevalence_all-TCGA-samps.txt", header = T, sep = ",")
+rarprev <- read.csv("../data/rarefied-prevalence_all-TCGA-samps.csv")
 
 ```
 
@@ -160,3 +158,5 @@ stacked_plotting(exo.k, large.k$kingdom, k.sampord, hpv.sata) +
   facet_row(vars(Alphapapillomavirus.9), scales = "free_x", space = "free") +
   ggsave("../figures/exorien_stacked-bar.png", height = 5, width = 5)
 ```
+
+# SITC: Dense forest
