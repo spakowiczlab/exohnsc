@@ -13,32 +13,126 @@ library(tidyr)
 library(Hmisc)
 library(ggforce)
 library(forcats)
+library(stringr)
 ```
 
 # load data
 
 ```{r}
 surv.res <- read.csv("../data/survival_multivar-microbes.csv", stringsAsFactors = F)
+data.dir <- "/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-15-2021"
+# exora <- read.csv(file.path(data.dir, "7-15-2021_tcga_exora-with-taxonomy.csv"), stringsAsFactors = F)
+```
+
+```{r}
+krakenmet <- read.delim("/fs/ess/PAS1695/exoticpipe/external-data/kraken2-metaphlan-taxonomy.txt",
+                         header = F, stringsAsFactors = F) %>%
+    rename("Taxonomy" = "V1")
+```
+
+```{r}
+assign_taxonomy <- function(met.all, exo.obj){
+  met.good <- met.all %>%
+    dplyr::filter(!grepl("\n", Taxonomy))
+  met.fix <- met.all %>%
+    dplyr::filter(grepl("\n", Taxonomy)) 
+  
+  fix.taxa.amalgam <- paste(met.fix$Taxonomy, collapse = "\n")
+  fix.taxa.split <- str_split(pattern = "\n", fix.taxa.amalgam)[[1]]
+  met.repared <- as.data.frame(cbind(Taxonomy = fix.taxa.split,
+                                     V2 = 1))%>%
+    tidyr::separate(Taxonomy, into = c("Taxonomy"), sep = "\t") %>%
+    mutate(V2 = as.numeric(as.character(V2)))
+  
+  taxkey <- bind_rows(met.good, met.repared) %>%
+    dplyr::filter(grepl("s__", Taxonomy)) %>%
+    mutate(specjoin = gsub(".*s__(.*)", "\\1", Taxonomy),
+           specjoin = make.names(specjoin))
+  
+  exo.obj.tax <- exo.obj %>%
+    mutate(specjoin = microbe)%>%
+    left_join(taxkey) %>%
+    mutate(domain = gsub("(d__\\w+).*", "\\1", Taxonomy),
+           kingdom = ifelse(grepl("k__", Taxonomy),gsub(".*(k__\\w+).*", "\\1", Taxonomy), NA),
+           phylum = ifelse(grepl("p__", Taxonomy),gsub(".*(p__\\w+).*", "\\1", Taxonomy), NA),
+           order = ifelse(grepl("o__", Taxonomy),gsub(".*(o__\\w+).*", "\\1", Taxonomy), NA),
+           class = ifelse(grepl("c__", Taxonomy),gsub(".*(c__\\w+).*", "\\1", Taxonomy), NA),
+           family = ifelse(grepl("f__", Taxonomy),gsub(".*(f__\\w+).*", "\\1", Taxonomy), NA),
+           genus = ifelse(grepl("g__", Taxonomy),gsub(".*(g__\\w+).*", "\\1", Taxonomy), NA),
+           species = gsub(".*(s__.*)", "\\1", Taxonomy)
+    ) %>%
+    mutate(genus = ifelse(is.na(genus), paste0("g__unclassified-", species), genus),
+           family = ifelse(is.na(family), paste0("f__unclassified-", gsub("g__unclassified-", "", genus)), family),
+           order = ifelse(is.na(order), paste0("o__unclassified-", gsub("f__unclassified-", "", family)), order),
+           class = ifelse(is.na(class), paste0("c__unclassified-", gsub("o__unclassified-", "", order)), class),
+           phylum = ifelse(is.na(phylum), paste0("p__unclassified-", gsub("c__unclassified-", "", class)),phylum),
+           kingdom = ifelse(is.na(kingdom), paste0("k__unclassified-", gsub("p__unclassified-", "", phylum)), kingdom),
+           domain = ifelse(is.na(domain), paste0("d__unclassified-", gsub("k__unclassified-", "", kingdom)), domain)) %>%
+    dplyr::select(-V2)
+  
+  return(exo.obj.tax)
+  
+}
 ```
 
 # Format
 
 ```{r}
+alphapaps <- paste0("Alphapapillomavirus.", c(5,6,9,7,11))
+
 surv.plotin <- surv.res %>%
   mutate(nlogp = -log(p.value),
-         logHR = log(hazard.ratio)) %>%
-  filter(confint.high < Inf | confint.low > 0)
+         logHR = log(hazard.ratio),
+         alphapap = term %in% alphapaps) %>%
+  dplyr::filter(confint.high < Inf | confint.low > 0) %>%
+  mutate(microbe = term) %>%
+  assign_taxonomy(krakenmet, .)
 ```
 
 # Try volcano version
 
 ```{r}
 surv.plotin %>%
-  ggplot(aes(x = logHR, y = nlogp)) +
+  ggplot(aes(x = logHR, y = nlogp, color = domain, size = alphapap, shape = alphapap, alpha = alphapap)) +
   geom_point() +
   geom_hline(yintercept = -log(0.05), lty = 2) +
   geom_vline(xintercept = 0, lty = 2) +
+  scale_color_brewer(palette = "Set1") +
+  scale_shape_manual(breaks = c(F,T), values = c(20, 18)) +
+  scale_alpha_manual(values = c(.5,1)) +
   labs(x = "log(HR)", y = "-log(p.value)") +
+  guides(size = FALSE, shape = FALSE, alpha = FALSE) +
   theme_bw() 
 ggsave("../figures/volcano_survival-multivariate.png")
+```
+
+# Add KM curve for aggregated HPV
+
+```{r}
+library(survival)
+library(survminer)
+
+clin <- read.csv(file.path(data.dir, "7-15-2021_tcga_clinical.csv"), stringsAsFactors = F)
+hpv.prev <- read.csv("../data/HPV-prevalence-per-sample.csv", stringsAsFactors = F)
+
+```
+
+```{r}
+survin <- hpv.prev %>%
+  rename("file_id.BAM" = "sample") %>%
+  left_join(clin) %>%
+  mutate(smoking = ifelse(pack_years_smoked >= 10, 1, 0),
+         smoking = ifelse(is.na(smoking), 0, smoking),
+         age = age_at_diagnosis/365.25,
+         days = coalesce(days_to_death, days_to_last_follow_up),
+         vitalstatus = ifelse(vital_status == "Dead", 1, 0),
+         survstage = ifelse(grepl("IV", ajcc_clinical_stage), "Stage IV", ajcc_clinical_stage)) %>%
+  drop_na(days, vitalstatus)
+```
+
+```{r}
+surv.obj <- surv_fit(Surv(days, vitalstatus) ~ HPV.prev, data = survin )
+
+survplot <- ggsurvplot(surv.obj, pval = T, risk.table = T)
+ggsave(plot = print(survplot), filename = "../figures/KM-curve_aggregated-HPV.png", device = "png")
 ```
