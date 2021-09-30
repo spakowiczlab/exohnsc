@@ -1,0 +1,76 @@
+---
+title: "immune_cell_abundance"
+author: "Caroline Wheeler"
+date: "9/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+knitr::opts_chunk$set(echo = TRUE)
+
+setwd(dirname(getwd()))
+source("00-paths.R")
+```
+
+<!-- read in gene expression data -->
+<!-- ```{r} -->
+<!-- genes <- read.csv(file.path(paths$box, "tcga_gene-expressions.csv"))  -->
+<!-- ``` -->
+
+<!-- create matrix for CIBERSORT -->
+<!-- ```{r} -->
+<!-- write.table(genes, "/Users/wheeler.1017/Documents/GitHub/exohnsc/exploratory/data/cibersort_exohnsc.txt", sep = "\t", quote = FALSE, row.names = FALSE) -->
+<!-- ``` -->
+
+read in CIBERSORT results
+```{r}
+cells <- read.csv(file.path(paths$github, "CIBERSORTx_Job12_Results.csv"))
+
+clin <- read.csv(file.path(paths$box, "tcga_clinical.csv")) %>%
+  select(file_id.expression, file_id.BAM) %>%
+  rename(
+    'sample' = file_id.BAM,
+    'sample1' = file_id.expression,
+  )
+  
+# why is one sample dropped? 
+hpv <- read.csv(file.path(paths$github, "HPV-prevalence-per-sample.csv"))
+```
+
+fix names
+```{r}
+cells <- cells %>% 
+  mutate(sample1 = substr(Mixture, 2, length(Mixture))) %>%
+  mutate(sample1 = gsub(".", "-", sample1, fixed = TRUE))
+```
+
+combine + clean
+```{r}
+cells <- merge(cells, clin)
+cells <- merge(cells, hpv) %>%
+  select(-sample1, -Mixture, -P.value, -Correlation, -RMSE)
+```
+
+kruskal wallis test
+```{r}
+results <- list()
+
+for(i in colnames(cells[,3:24])){  
+  results[[i]] <- kruskal.test(formula(paste(i, "~ HPV.prev")), data = cells)
+}
+results
+```
+
+subset those with a p-value < 0.05 and CD8+Tcells and Tregs
+```{r}
+cells <- cells %>%
+  select(HPV.prev, B.cells.naive, T.cells.CD8, T.cells.follicular.helper, T.cells.regulatory..Tregs., Macrophages.M0, )
+```
+
+Boxplot to visualize
+```{r}
+
+```
+
