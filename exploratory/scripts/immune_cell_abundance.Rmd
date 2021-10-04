@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(ggplot2)
+library(ggpubr)
 library(reshape2)
 
 knitr::opts_chunk$set(echo = TRUE)
@@ -71,16 +72,29 @@ cells <- cells %>%
   select(HPV.prev, B.cells.naive, T.cells.CD8, T.cells.follicular.helper, T.cells.regulatory..Tregs., Macrophages.M0, )
 
 cells <- melt(cells, id.vars=0:1)
+
+cells <- cells %>%
+  mutate(HPV.prev = ifelse(HPV.prev == 0, "HPV negative", "HPV postive")) %>%
+  mutate(variable = ifelse(variable == "B.cells.naive", "Naive B-cells",
+                           ifelse(variable == "Macrophages.M0", "M0 Macrophages",
+                                  ifelse(variable == "T.cells.regulatory..Tregs.", "Tregs",
+                                         ifelse(variable == "T.cells.follicular.helper", "Follicular-helper T-cells", 
+                                                ifelse(variable == "T.cells.CD8", "CD8+ T-cells", variable))))))
 ```
 
 Boxplot to visualize
-```{r}
-hpv.labs <- c("HPV negative", "HPV positive")
-names(hpv.labs) <- c("0", "1")
+```{r fig.height=8, fig.width=10}
+#hpv.labs <- c("HPV negative", "HPV positive")
+#names(hpv.labs) <- c("0", "1")
+#bp <- bp + facet_grid(. ~ HPV.prev, labeller = labeller(HPV.prev = hpv.labs)) 
 
-bp <- ggplot(cells, aes(x=variable, y=value, group=variable)) + 
-  geom_boxplot(aes(fill=variable))
-bp <- bp + facet_grid(. ~ HPV.prev, labeller = labeller(HPV.prev = hpv.labs)) + xlab("Immune Cell Type") + ylab("Abundance") + labs(fill = "Immune Cell Type") + theme(axis.text.x = element_text(angle = 45, hjust=1))
+bp <- ggplot(cells, aes(x=variable, y=value)) + geom_boxplot(aes(fill=HPV.prev)) + xlab("Immune Cell Type") + ylab("Abundance") + labs(fill = "") + theme_bw(base_size = 18) + theme(axis.text.x = element_text(angle = 45, hjust=1))
+
 bp
+
+```
+save plot
+```{r}
+ggsave(filename = "/Users/wheeler.1017/Documents/projects_rando/hnsc_immunecell_boxplot.png", plot = bp, width = 10, height = 8, dpi = 600)
 ```
 
