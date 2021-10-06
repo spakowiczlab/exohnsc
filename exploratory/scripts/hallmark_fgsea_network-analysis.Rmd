@@ -1,0 +1,143 @@
+---
+title: "Hallmark_FGSEA_network-analysis"
+author: "Malven"
+date: "10/3/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#Load packages
+library(tidyverse)
+library(ggplot2)
+library(geomnet)
+library(writexl)
+library(msigdbr)
+library(fgsea)
+library(dplyr)
+library(igraph)
+library(tidygraph)
+library(ggraph)
+```
+
+# Load and prepare data
+
+```{r}
+HPV_DEGs <- read_table("../data/HPV_deseq.genes.txt")
+
+sig.HPV_DEGs <- HPV_DEGs %>%
+  arrange(pvalue) %>%
+  filter(pvalue < 0.05) %>%
+  select(Genes, pvalue, log2FoldChange, stat)
+```
+
+# MSIGDBR data preparation
+
+```{r}
+msig.human <- msigdbr(species = "Homo sapiens") %>%
+  select(gs_cat, gs_subcat, entrez_gene, gs_name, gene_symbol, gs_description) %>%
+  dplyr::rename("pathname" = gs_name, "genes" = gene_symbol, "desc" = gs_description,
+                "category" = gs_cat, "sub" = gs_subcat, 
+                "NCBI Entrez ID" = entrez_gene) 
+
+msig.hlmrk <- msig.human %>%
+    filter(category=="H") %>%
+    filter(grepl("",sub))%>%
+    unique()
+
+hlmrk.paths <- msig.hlmrk %>%
+     select(genes, pathname) %>%
+     split(x = .$genes, f = .$pathname)
+```
+
+# FGSEA analysis
+
+```{r}
+# To run FGSEA, genes cannot be in a dataframe. Thus, we have to deframe it, this step does exactly that.
+
+sig.genes <- sig.HPV_DEGs %>%
+  select(Genes, stat) %>%
+  deframe()
+
+
+# Run FGSEA
+
+res <- fgsea(pathways = hlmrk.paths, stats = sig.genes, eps = 0.0, scoreType = "pos")
+
+res2 <- res %>%
+  arrange(pval) %>%
+  filter(padj < 0.01) %>%
+  rename('pathname'= pathway, "genes" = leadingEdge) %>%
+  unnest(genes) %>%
+  left_join(msig.hlmrk, by = c("pathname","genes")) %>%
+  unique() %>%
+  select(category,`NCBI Entrez ID`, genes, pathname, pval, padj, desc, log2err, size, ES, NES)
+```
+
+# Network Analysis (Data Preparation and Visualization)
+
+```{r}
+# Create nodes
+
+hlmrk.pathname <- res2 %>%
+  select(pathname) %>%
+  unique() %>%
+  rename("nodes_label" = pathname)
+
+hlmrk.genes <- res2 %>%
+  select(genes) %>%
+  unique() %>%
+  rename("nodes_label" = genes)
+
+hlmrk.nodes <- hlmrk.pathname %>%
+  full_join(hlmrk.genes) %>%
+  rowid_to_column(var = "nodes_id")
+
+# Create edges
+
+path.edges <- hlmrk.nodes %>%
+  rename("path.edges" = nodes_label)
+
+genes.edges <- hlmrk.nodes %>%
+  rename("genes.edges" = nodes_label)
+
+hlmrk.edges <- res2 %>%
+  select(pathname, genes) %>%
+  rename("path.edges" = pathname, "genes.edges" = genes) %>%
+  left_join(path.edges) %>%
+  rename("from_id" = nodes_id) %>%
+  left_join(genes.edges) %>%
+  rename("to_id" = nodes_id) %>%
+  select(from_id,to_id)
+
+network.dat <- tbl_graph(nodes = hlmrk.nodes, edges = hlmrk.edges, directed = FALSE) %>%
+  activate(nodes) %>%
+  mutate(sz = ifelse(nodes_id < 6, yes = 1.75, no = 1.5)) %>%
+  mutate(fll = ifelse(nodes_id < 6, yes = "black" , no = "darkred")) %>%
+  activate(edges) %>%
+  mutate(colored = ifelse(from==1, yes = "a",
+                           ifelse(from==2, yes = "e", 
+                                         ifelse(from==3, yes = "i",
+                                                ifelse(from==4, yes = "o", no = "u")))))
+
+#network.as.table <- as_tbl_graph(network.dat) 
+#network.as.table 
+
+ggraph(network.dat, layout = 'fr') + 
+  geom_edge_link(aes(color = colored)) + 
+  scale_edge_color_manual(breaks = c("a", "e", "i", "o", "u"),
+                          values = c("pink", "purple", "orange", "blue", "darkgreen"),
+                          label = c("HALLMARK_E2F_TARGETS", "HALLMARK_G2M_CHECKPOINT","HALLMARK_MITOTIC_SPINDLE",
+                                    "HALLMARK_SPERMATOGENESIS", "HALLMARK_DNA_REPAIR"),
+                          name = "Pathways")+
+  geom_node_point(aes(fill = fll, size = "degree"), show.legend = FALSE, shape = 21, stroke = 0.5) +
+  scale_fill_manual(values = c("black","red")) +
+  geom_node_label(aes(label = nodes_label), repel = TRUE, size = 3, box.padding = 0.1, max.overlaps = Inf) +
+  #ggtitle("Hallmark - Network") +
+  theme_net() +
+  theme(#legend.key.size = unit(0.5, 'cm'),
+        legend.title = element_text(size=6),
+        legend.text = element_text(size=6)) 
+
+ggsave("../figures/hallmark_network_analysis.png", height = 12, width = 12)
+```
