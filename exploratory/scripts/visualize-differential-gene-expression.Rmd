@@ -96,7 +96,7 @@ hpv.volc.dat %>%
   geom_vline(xintercept = c(-2.5,2.5), color = "red", linetype = 2) +
   scale_color_manual( breaks = c("UP", "DOWN", "NO"),
                       values = c("orange", "purple", "grey"),
-                      label  = c("Upstream", "Downstream", "Not Significant"),
+                      label  = c("Enriched", "Depleted", "Not Significant"),
                       name   = "Genes")+
   ggtitle("HPV - Positive vs Negative") +
   theme(legend.key.size = unit(0.5, 'cm'),
