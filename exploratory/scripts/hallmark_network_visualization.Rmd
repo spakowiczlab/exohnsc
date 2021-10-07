@@ -1,0 +1,114 @@
+---
+title: "Hallmark_network_visualization"
+author: "Malven"
+date: "10/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(geomnet)
+library(igraph)
+library(tidygraph)
+library(ggraph)
+```
+
+# Load Hallmark results and DESEq2 results
+
+```{r}
+res2 <- read.table("../data/FGSEA_Hallmark-results.csv", header = T, quote = "\"", sep = ",") %>%
+  arrange(pval) %>%
+  filter(padj < 0.01)
+
+sig.HPV_DEGs <- read.table("../data/HPV_deseq.genes.txt", header = T) %>%
+  arrange(pvalue) %>%
+  filter(pvalue < 0.05) %>%
+  mutate(HPV_stat = ifelse(log2FoldChange>0, yes = "Pos", no = "Neg")) %>%
+  select(Genes, pvalue, log2FoldChange, stat, HPV_stat)
+```
+
+# Network Analysis (Data Preparation and Visualization)
+
+```{r}
+# Determines whether the gene results from FGSEA, are enriched in HPV+ or HPV-
+
+hpv.enriched <- sig.HPV_DEGs %>%
+  filter(Genes %in% res2$genes) %>%
+  dplyr::rename("genes" = Genes) %>%
+  select(genes,HPV_stat)
+
+table(hpv.enriched$HPV_stat)
+
+# Create nodes
+
+hlmrk.pathname <- res2 %>%
+  select(pathname) %>%
+  unique() %>%
+  dplyr::rename("nodes_label" = pathname)
+
+hlmrk.genes <- res2 %>%
+  select(genes) %>%
+  unique() %>%
+  left_join(hpv.enriched) %>%
+  dplyr::rename("nodes_label" = genes)
+
+table(hlmrk.genes$HPV_stat) # just for a double confirmation
+
+hlmrk.nodes <- hlmrk.pathname %>%
+  full_join(hlmrk.genes) %>%
+  rowid_to_column(var = "nodes_id") %>%
+  select(nodes_id, nodes_label)
+
+# Create edges
+
+path.edges <- hlmrk.nodes %>%
+  dplyr::rename("path.edges" = nodes_label)
+
+genes.edges <- hlmrk.nodes %>%
+  dplyr::rename("genes.edges" = nodes_label)
+
+hlmrk.edges <- res2 %>%
+  select(pathname, genes) %>%
+  dplyr::rename("path.edges" = pathname, "genes.edges" = genes) %>%
+  left_join(path.edges) %>%
+  dplyr::rename("from_id" = nodes_id) %>%
+  left_join(genes.edges) %>%
+  dplyr::rename("to_id" = nodes_id) %>%
+  select(from_id,to_id)
+
+network.dat <- tbl_graph(nodes = hlmrk.nodes, edges = hlmrk.edges, directed = FALSE) %>%
+  activate(nodes) %>%
+  mutate(fll = ifelse(nodes_id < 6, yes = "black" , no = "darkred")) %>%
+  activate(edges) %>%
+  mutate(colored = ifelse(from==1, yes = "a",
+                           ifelse(from==2, yes = "e", 
+                                         ifelse(from==3, yes = "i",
+                                                ifelse(from==4, yes = "o", no = "u")))))
+
+network.as.table <- as_tbl_graph(network.dat) 
+network.as.table 
+
+# Network Plot
+
+ggraph(network.dat, layout = 'fr') + 
+  geom_edge_link(aes(color = colored)) + 
+  scale_edge_color_manual(breaks = c("a", "e", "i", "o", "u"),
+                          values = c("pink", "purple", "orange", "blue", "darkgreen"),
+                          label = c("HALLMARK_E2F_TARGETS", "HALLMARK_G2M_CHECKPOINT","HALLMARK_MITOTIC_SPINDLE",
+                                    "HALLMARK_SPERMATOGENESIS", "HALLMARK_DNA_REPAIR"),
+                          name = "Pathways")+
+  geom_node_point(aes(fill = fll, size = "degree"), show.legend = FALSE, shape = 21, stroke = 0.5) +
+  scale_fill_manual(values = c("black","red")) +
+  geom_node_label(aes(label = nodes_label), repel = TRUE, size = 3, box.padding = 0.1, max.overlaps = Inf) +
+  #ggtitle("Hallmark - Network") +
+  theme_net() +
+  theme(#legend.key.size = unit(0.5, 'cm'),
+        legend.title = element_text(size=6),
+        legend.text = element_text(size=6)) 
+
+ggsave("../figures/hallmark_network_analysis.png", height = 12, width = 12)
+
+```

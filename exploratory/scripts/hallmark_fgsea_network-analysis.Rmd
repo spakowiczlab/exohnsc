@@ -1,0 +1,74 @@
+---
+title: "Hallmark_FGSEA_network-analysis"
+author: "Malven"
+date: "10/3/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#Load packages
+library(tidyverse)
+library(ggplot2)
+library(msigdbr)
+library(fgsea)
+library(dplyr)
+```
+
+# Load and prepare data
+
+```{r}
+HPV_DEGs <- read_table("../data/HPV_deseq.genes.txt")
+
+sig.HPV_DEGs <- HPV_DEGs %>%
+  arrange(pvalue) %>%
+  filter(pvalue < 0.05) %>%
+  mutate(HPV_stat = ifelse(log2FoldChange>0, yes = "Pos", no = "Neg")) %>%
+  select(Genes, pvalue, log2FoldChange, stat, HPV_stat)
+
+# shows the total amount of HPV+ and HPV- genes there are
+table(sig.HPV_DEGs$HPV_stat)
+```
+
+# MSIGDBR data preparation
+
+```{r}
+msig.human <- msigdbr(species = "Homo sapiens") %>%
+  select(gs_cat, gs_subcat, entrez_gene, gs_name, gene_symbol, gs_description) %>%
+  dplyr::rename("pathname" = gs_name, "genes" = gene_symbol, "desc" = gs_description,
+                "category" = gs_cat, "sub" = gs_subcat, 
+                "NCBI Entrez ID" = entrez_gene) 
+
+msig.hlmrk <- msig.human %>%
+    filter(category=="H") %>%
+    filter(grepl("",sub))%>%
+    unique()
+
+hlmrk.paths <- msig.hlmrk %>%
+     select(genes, pathname) %>%
+     split(x = .$genes, f = .$pathname)
+```
+
+# FGSEA analysis
+
+```{r}
+# To run FGSEA, genes cannot be in a dataframe. Thus, we have to deframe it, this step does exactly that.
+
+sig.genes <- sig.HPV_DEGs %>%
+  select(Genes, stat) %>%
+  deframe()
+
+# Run FGSEA
+
+res <- fgsea(pathways = hlmrk.paths, stats = sig.genes, eps = 0.0, scoreType = "pos")
+
+res2 <- res %>%
+  arrange(pval) %>%
+  dplyr::rename('pathname'= pathway, "genes" = leadingEdge) %>%
+  unnest(genes) %>%
+  left_join(msig.hlmrk, by = c("pathname","genes")) %>%
+  unique() %>%
+  select(category,`NCBI Entrez ID`, genes, pathname, pval, padj, desc, log2err, size, ES, NES)
+
+write.csv(res2, row.names = F, file = "../data/FGSEA_Hallmark-results.csv")
+```
