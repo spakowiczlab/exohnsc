@@ -75,59 +75,5 @@ HPV_deseq.genes <- results(dds, name = "HPV_stat_Pos_vs_Neg") %>%
   arrange(pvalue)
 
 write.table(HPV_deseq.genes, row.names = F, sep = "\t", quote = F, col.names = T, file = "../data/HPV_deseq.genes.txt")
-```
-
-# Volcano Plot & Box Plot
-```{r}
-# Volcano Plot
-
-hpv.volc.dat <- HPV_deseq.genes %>%
-  mutate(diffexp = ifelse(log2FoldChange > 2.5 & pvalue < 0.05, yes = "UP",
-                   ifelse(log2FoldChange < -2.5 & pvalue < 0.05, yes = "DOWN", no = NA))) %>%
-  mutate(diffexp = ifelse(is.na(diffexp), yes = "NO", no = diffexp))
-
-hpv.volc.dat %>%
-  ggplot(aes(x = log2FoldChange, y = -log10(pvalue), col = diffexp)) +
-  geom_point() +
-  geom_text_repel(data=subset(hpv.volc.dat, log2FoldChange < -3.5 | log2FoldChange > 3.5),
-                        aes(x = log2FoldChange, y = -log10(pvalue), label = Genes),
-                  colour = "black", size = 2.5, fontface= 2, box.padding = 1.0, max.overlaps = Inf) +
-  geom_hline(yintercept = 0.05, color = "red", linetype = 2) +
-  geom_vline(xintercept = c(-2.5,2.5), color = "red", linetype = 2) +
-  scale_color_manual( breaks = c("UP", "DOWN", "NO"),
-                      values = c("orange", "purple", "grey"),
-                      label  = c("Enriched", "Depleted", "Not Significant"),
-                      name   = "Genes")+
-  ggtitle("HPV - Positive vs Negative") +
-  theme(legend.key.size = unit(0.5, 'cm'),
-        legend.title = element_text(size=10),
-        legend.text = element_text(size=10)) +
-  theme_bw()
-
-ggsave("../figures/volcano_differential-gene-expression.png", width = 7, height = 6, device = "png")
-
-
-# Here, I wanted to visualize the DGEs in a boxplot instead.
-# Boxplot
-
-sig.genes <- HPV_deseq.genes$Genes[1:10] # here, I extracted the top 10 significant genes
-
-# Created a table for boxplot
-
-boxdat <- tcga_norm %>%
-  select(sample, all_of(sig.genes)) %>%
-  gather(-sample, key = "gene", value = "norm.exp") %>%
-  rename(sample = "sample.expression") %>%
-  inner_join(clin.mod)
-
-boxdat %>%
-  dplyr::rename("HPV_status" = HPV_stat) %>%
-  ggplot(aes(x = gene, y = norm.exp)) + 
-  geom_boxplot(aes(fill = HPV_status)) +
-  theme_bw() +
-  theme(axis.text.x= element_text(angle = 45, hjust = 1)) +
-  labs(x = "", y = "Normalized Expression")
 
 ```
-
-
