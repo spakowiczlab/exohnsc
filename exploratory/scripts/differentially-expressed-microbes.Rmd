@@ -1,0 +1,160 @@
+---
+title: "Differentially-expressed-microbes"
+author: "Malven"
+date: "10/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(forcats)
+library(ggplot2)
+library(ggrepel)
+library(dplyr)
+library("DESeq2") # install DESeq2 from https://bioconductor.org/packages/release/bioc/html/DESeq2.html
+
+```
+
+# Load data
+```{r}
+data.dir <- "/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-15-2021"
+
+tcga_clin <- read.csv(file.path(data.dir, "7-15-2021_tcga_clinical.csv"), stringsAsFactors = F) %>%
+  dplyr::rename("sample" = file_id.BAM)
+
+tcga.exora <- read.csv(file.path(data.dir,"7-15-2021_tcga_exora-with-taxonomy.csv"), stringsAsFactors = F)
+
+prev <- read.csv("../data/HPV-prevalence-per-sample.csv")
+
+```
+
+# CountData (Taxonomic Ranks) Preparation
+```{r}
+# Taxanomic Rank dataframe
+  
+taxaranks <- function(x) {
+  
+  res <- tcga.exora[, c("sample", "microbe", x, "exo.ra")] %>%
+    as.data.frame() %>%
+    #filter(microbe != "Homo.sapiens") %>%
+    select(-c("microbe"))
+  
+  counts <- res %>%
+    group_by(res[,c("sample",x)]) %>%
+    summarise(rel_abd = sum(exo.ra, na.rm = T)) %>%
+    mutate(rel_abd = round(rel_abd*1e8)) %>%
+    spread(key = "sample", value = "rel_abd") %>%
+    column_to_rownames(var = x)
+
+}
+
+tax.domain <- taxaranks("domain") 
+tax.kingdom <- taxaranks("kingdom")
+tax.phlyum <- taxaranks("phylum")
+tax.class <- taxaranks("class")
+tax.order <- taxaranks("order")
+tax.family <- taxaranks("family")
+tax.genus <- taxaranks("genus")
+tax.species <- taxaranks("species")
+
+```
+
+# ColData (Taxa table with HPV_stat design) preparation
+
+```{r}
+
+# ColData (without TCGA clinical data)
+
+#clin.tax <- function(tax.ranks) {
+  
+#clin.dat <- tax.ranks %>%
+  #rownames_to_column(var = "taxa") %>%
+  #gather(-taxa, key = "sample", value = "counts") %>%
+  #spread(key = "taxa", value = "counts") %>%
+  #left_join(prev) %>%
+  #mutate(HPV_stat = ifelse(HPV.prev == 1, yes = "Pos", no = "Neg")) %>%
+  #select(sample, HPV_stat) %>%
+  #as.data.frame()
+  #drop_na(HPV_stat) 
+#}
+
+# ColData (with TCGA clinical data)
+
+clin.tax <- function(tax.ranks) {
+  
+  clin.dat <- tax.ranks %>%
+    rownames_to_column(var = "taxa") %>%
+    gather(-taxa, key = "sample", value = "counts") %>%
+    spread(key = "taxa", value = "counts") %>%
+    left_join(prev)
+  
+  clin.bd <- tcga_clin %>%
+    left_join(clin.dat) %>%
+    drop_na(HPV.prev) %>%
+    mutate(HPV_stat = ifelse(HPV.prev == 1, yes = "Pos", no = "Neg")) %>%
+    select(sample, HPV_stat) %>%
+    as.data.frame()
+  
+  }
+
+clin.dom <- clin.tax(tax.domain) 
+clin.king <- clin.tax(tax.kingdom) 
+clin.phy <- clin.tax(tax.phlyum) 
+clin.class <- clin.tax(tax.class) 
+clin.order <- clin.tax(tax.order)  
+clin.fam <- clin.tax(tax.family) 
+clin.genus <- clin.tax(tax.genus) 
+clin.spec <- clin.tax(tax.species) 
+
+```
+
+# DESeq analysis
+```{r}
+
+taxa.deseq <- function(tax.ranks, clin.dat, tax) {
+  
+  dds <- DESeqDataSetFromMatrix (countData= as.matrix(tax.ranks) ,
+                                 colData= clin.dat, design= ~HPV_stat)
+  dds <- DESeq (dds)
+  
+  dds.res <- results(dds, name = "HPV_stat_Pos_vs_Neg") %>%
+    as.data.frame() %>%
+    rownames_to_column(var = "Taxonomy") %>%
+    mutate(tax_class = tax)
+  
+  return(dds.res)
+  
+  }
+
+# Taxa class 
+des.dom <- taxa.deseq(tax.domain, clin.dom, "domain")
+des.king <- taxa.deseq(tax.kingdom, clin.king, "kingdom")
+des.phy <- taxa.deseq(tax.phlyum, clin.phy, "phlyum")
+des.class <- taxa.deseq(tax.class, clin.class, "class")
+des.order <- taxa.deseq(tax.order, clin.order, "order")
+des.fam <- taxa.deseq(tax.family, clin.fam, "family")
+des.genus <- taxa.deseq(tax.genus, clin.genus, "genus")
+des.spec <- taxa.deseq(tax.species, clin.spec, "species")
+
+```
+
+# Create a large Taxanomy table containing every dds results from different taxa class
+```{r}
+
+des.taxanomy <- des.dom %>%
+  full_join(des.king) %>%
+  full_join(des.phy) %>%
+  full_join(des.class) %>%
+  full_join(des.order) %>%
+  full_join(des.fam) %>%
+  full_join(des.genus) %>%
+  full_join(des.spec) 
+
+HPV_deseq.microbes <- des.taxanomy %>%
+   arrange(pvalue)
+
+write.table(HPV_deseq.microbes, row.names = F, sep = "\t", quote = F, col.names = T, file = "../data/HPV_deseq.microbes.txt")
+
+```
