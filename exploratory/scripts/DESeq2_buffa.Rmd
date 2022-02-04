@@ -1,0 +1,137 @@
+---
+title: "DESeq2_buffa"
+author: "Rebecca Hoyd"
+date: "2/4/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(DESeq2)
+```
+
+# Load data
+
+```{r}
+BHscores <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/hnsc_buffa.csv",
+                     stringsAsFactors = F)
+HPVstatus <- read.csv("../data/HPV-prevalence-per-sample.csv",
+                      stringsAsFactors = F)
+
+exora <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-15-2021/7-15-2021_tcga_exora-with-taxonomy.csv", stringsAsFactors = F)
+clin <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-15-2021/7-15-2021_tcga_clinical.csv", 
+                 stringsAsFactors = F) 
+```
+
+# Format
+
+```{r function for getting count data}
+taxaranks <- function(x) {
+  
+  res <- exora %>%
+    select(c("sample", x, "exo.ra")) %>%
+    as.data.frame() %>%
+    group_by_at(c("sample",x)) %>%
+    summarise(rel_abd = sum(exo.ra, na.rm = T)) %>%
+    mutate(rel_abd = round(rel_abd*1e8)) %>%
+    spread(key = "sample", value = "rel_abd") %>%
+    column_to_rownames(var = x)
+
+  return(res)
+}
+```
+
+```{r formatting to wide matrices}
+taxlevs <- c("domain","kingdom", "phylum", "class",
+             "order", "family", "genus", "species")
+
+count.matrices <- lapply(taxlevs, function(y) taxaranks(y))
+names(count.matrices) <- taxlevs
+
+identical(colnames(count.matrices[[1]]), colnames(count.matrices[[2]]))
+```
+
+```{r manipulate clinical data}
+meta <- BHscores %>%
+  rename("sample" = "file_id.expression") %>%
+  left_join(clin) %>%
+  mutate(sample = file_id.BAM) %>%
+  select(sample, file_id.expression, buffa.score) %>%
+  inner_join(HPVstatus) %>%
+  mutate(buffa.tert = case_when(buffa.score < quantile(buffa.score, .3333) ~ 0,
+                                 buffa.score > quantile(buffa.score, .6666) ~ 1),
+         HPV.prev = ifelse(HPV.prev == 1, "Y", "N"))
+
+countmat.ord <- data.frame(sample = colnames(count.matrices[[1]]))
+
+meta <- countmat.ord %>%
+  left_join(meta) 
+  
+identical(meta$sample, colnames(count.matrices[[1]]))
+
+```
+
+# DESeq
+
+```{r run for HPV}
+HPV.dds.ls <- lapply(count.matrices, function(x) DESeqDataSetFromMatrix(
+  countData = x,
+  design = ~HPV.prev,
+  colData = meta)
+  )
+
+HPV.dds.ls <- lapply(HPV.dds.ls, function(x) DESeq(x))
+
+HPV.res <- lapply(HPV.dds.ls, function(x) results(x) %>%
+                    as.data.frame %>%
+                    rownames_to_column(var = "taxa")) %>%
+  bind_rows() %>%
+  mutate(test.var = "HPV")
+```
+
+```{r run for BH}
+# We have to remove NAs ourselves, deseq2 does not handle that
+BH.good <- !is.na(meta$buffa.tert)
+meta.BH <- meta[BH.good,]
+BH.mats <- lapply(count.matrices, function(x) x[,BH.good])
+
+BH.dds.ls <- lapply(BH.mats, function(x) DESeqDataSetFromMatrix(
+  countData = x,
+  design = ~buffa.tert,
+  colData = meta.BH)
+  )
+
+BH.dds.ls <- lapply(BH.dds.ls, function(x) DESeq(x))
+
+BH.res <- lapply(BH.dds.ls, function(x) results(x) %>%
+                    as.data.frame %>%
+                    rownames_to_column(var = "taxa")) %>%
+  bind_rows() %>%
+  mutate(test.var = "BH")
+```
+
+# Table results
+
+```{r}
+all.res <- bind_rows(HPV.res, BH.res)
+
+table.input <- all.res %>%
+  mutate(sig = ifelse(padj < 0.05, 1, 0),
+         direction = ifelse(sig == 0|is.na(sig), "None",
+                            ifelse(log2FoldChange >= 0, "High", "Low"))) %>%
+  select(taxa, test.var, direction) %>%
+  spread(key = "test.var", value = "direction")
+
+table.res <- table.input %>%
+  group_by(BH, HPV) %>%
+  tally()
+```
+
+```{r}
+table.res %>%
+  mutate(HPV = paste0("HPV.", HPV)) %>%
+  spread(key = "HPV", value = "n") 
+```
+
