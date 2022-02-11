@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(tableone)
 library(lubridate)
+
+
 ```
 
 read in data
@@ -19,10 +21,24 @@ clin <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-26-2021/7-26
   rename("Sex" = gender,
          "Vital Status" = vital_status)
 
+exora <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-26-2021/7-26-2021_tcga_exora-with-taxonomy.csv") %>%
+  select(sample) %>%
+  distinct() %>%
+  rename("file_id.BAM" = sample)
+
+clin <- merge(clin, exora, all = FALSE)
+
 buffa <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/hnsc_buffa.csv") %>%
-  rename("file_id.expression" = sample)
+  rename("file_id.expression" = sample,
+         "Buffa Score" = buffa.score)
 
 clin <- merge(clin, buffa)
+
+hpv <- read.csv("/users/PAS1695/whee57/Github/exohnsc/exploratory/data/HPV-prevalence-per-sample.csv") %>%
+  rename("file_id.BAM" = sample) %>%
+  mutate("HPV present" = ifelse(HPV.prev == 1, "Yes", "No"))
+    
+clin <- merge(clin, hpv)
 ```
 
 convert days to years for age
@@ -47,7 +63,7 @@ clin %>% select(stage) %>% distinct()
 Make metastatic variable 
 ```{r}
 clin <- clin %>%
-  mutate(metastatic = ifelse(clin$stage == "Stage IVA" | clin$stage == "Stage IVB" | clin$stage == "Stage IVC", "Yes", "No"))
+  mutate(Metastatic = ifelse(clin$stage == "Stage IVA" | clin$stage == "Stage IVB" | clin$stage == "Stage IVC", "Yes", "No"))
 ```
 
 view primary site categories
@@ -57,6 +73,10 @@ Oral Cavity = base of tongue + floor of mouth + lip + parts of tongue + tonsil +
 Other = bones + ill-defined sites (n = 71)
 ```{r}
 table(clin$primary_site)
+```
+remove bone sample
+```{r}
+clin <- clin[!(clin$primary_site == "Bones, joints and articular cartilage of other and unspecified sites"),]
 ```
 
 make new primary site variable with fewer categories
@@ -69,22 +89,19 @@ clin <- clin %>%
   mutate("Primary Site" = case_when(primary_site %in% oropharynx.class ~ "Oropharynx",
                               primary_site %in% oralcavity.class ~ "Oral Cavity",
                               primary_site %in% larhypopharynx.class ~
-                                "Larynx/Hypopharynx")) %>%
-  filter(!is.na('Primary Site'))
+                                "Larynx/Hypopharynx")) 
 ```
 
 
 make table
 ```{r}
-variables_listed <- c("Age", "Sex", "metastatic", "Primary Site", "Vital Status")
+variables_listed <- c("Age", "Sex", "Metastatic", "Buffa Score", "HPV present")
+cat_vars <- c("Sex", "Metastatic", "HPV.prev")
 
-cat_vars <- c("Primary Site")
-
-rcc <- CreateTableOne(vars= variables_listed, data= clin, factorVars = cat_vars)
+rcc <- CreateTableOne(vars= variables_listed, data= clin, factorVars = cat_vars, strata = "Primary Site")
 tab <- print(rcc, noSpaces = TRUE, printToggle = FALSE, quote = FALSE, test = FALSE)
 tab
 ```
 
 
- 
 
