@@ -1,0 +1,90 @@
+---
+title: "table 1 - ASCO"
+author: "Caroline Wheeler"
+date: "2/4/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tableone)
+library(lubridate)
+```
+
+read in data
+```{r}
+clin <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-26-2021/7-26-2021_tcga_clinical.csv") %>%
+  rename("Sex" = gender,
+         "Vital Status" = vital_status)
+
+buffa <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/hnsc_buffa.csv") %>%
+  rename("file_id.expression" = sample)
+
+clin <- merge(clin, buffa)
+```
+
+convert days to years for age
+```{r}
+clin <- clin %>%
+  mutate(Age = age_at_diagnosis*0.00273973)
+```
+
+create new stage variable using pathologic stage > clinical stage AND change "Dead" to "Deceased"
+```{r}
+#if pathologic styage is NA, grab clincial stage
+clin <- clin %>%
+  mutate(stage = ifelse(is.na(clin$ajcc_pathologic_stage), clin$ajcc_clinical_stage, clin$ajcc_pathologic_stage),
+         'Vital Status' = ifelse(clin$`Vital Status` == "Dead", "Deceased", "Alive")) 
+```
+
+stage options
+```{r}
+clin %>% select(stage) %>% distinct()
+```
+
+Make metastatic variable 
+```{r}
+clin <- clin %>%
+  mutate(metastatic = ifelse(clin$stage == "Stage IVA" | clin$stage == "Stage IVB" | clin$stage == "Stage IVC", "Yes", "No"))
+```
+
+view primary site categories
+Pharynx = Hypopharynx + Oropharynx (n = 19)
+Larynx (n = 111)
+Oral Cavity = base of tongue + floor of mouth + lip + parts of tongue + tonsil + gum + parts of mouth + palate (n = 299)
+Other = bones + ill-defined sites (n = 71)
+```{r}
+table(clin$primary_site)
+```
+
+make new primary site variable with fewer categories
+```{r}
+oropharynx.class <- c("Base of tongue", "Oropharynx", "Palate", "Tonsil")
+oralcavity.class <- c("Floor of mouth", "Gum", "Lip","Other and ill-defined sites in lip, oral cavity and pharynx","Other and unspecified parts of mouth","Other and unspecified parts of tongue")
+larhypopharynx.class <- c("Hypopharynx", "Larynx")
+
+clin <- clin %>%
+  mutate("Primary Site" = case_when(primary_site %in% oropharynx.class ~ "Oropharynx",
+                              primary_site %in% oralcavity.class ~ "Oral Cavity",
+                              primary_site %in% larhypopharynx.class ~
+                                "Larynx/Hypopharynx")) %>%
+  filter(!is.na('Primary Site'))
+```
+
+
+make table
+```{r}
+variables_listed <- c("Age", "Sex", "metastatic", "Primary Site", "Vital Status")
+
+cat_vars <- c("Primary Site")
+
+rcc <- CreateTableOne(vars= variables_listed, data= clin, factorVars = cat_vars)
+tab <- print(rcc, noSpaces = TRUE, printToggle = FALSE, quote = FALSE, test = FALSE)
+tab
+```
+
+
+ 
+
