@@ -11,8 +11,6 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(tableone)
 library(lubridate)
-
-
 ```
 
 read in data
@@ -99,9 +97,12 @@ variables_listed <- c("Age", "Sex", "Metastatic", "Buffa Score", "HPV present")
 cat_vars <- c("Sex", "Metastatic", "HPV.prev")
 
 rcc <- CreateTableOne(vars= variables_listed, data= clin, factorVars = cat_vars, strata = "Primary Site")
-tab <- print(rcc, noSpaces = TRUE, printToggle = FALSE, quote = FALSE, test = FALSE)
+tab <- print(rcc, noSpaces = TRUE, printToggle = FALSE, quote = FALSE)
 tab
 ```
 
+```{r}
+write.csv(tab, "/users/PAS1695/whee57/Github/exohnsc/exploratory/data/table1.csv")
+```
 
 
