@@ -10,6 +10,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(DESeq2)
+library(rlist)
+library(glmm)
+library(broom)
 ```
 
 # Load data
@@ -23,6 +26,28 @@ HPVstatus <- read.csv("../data/HPV-prevalence-per-sample.csv",
 exora <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-15-2021/7-15-2021_tcga_exora-with-taxonomy.csv", stringsAsFactors = F)
 clin <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-15-2021/7-15-2021_tcga_clinical.csv", 
                  stringsAsFactors = F) 
+```
+
+# Define HSNC locations
+
+```{r}
+oropharynx.class <- c("Base of tongue", "Oropharynx", "Palate", "Tonsil")
+oralcavity.class <- c("Floor of mouth", "Gum", "Lip",
+                      "Other and ill-defined sites in lip, oral cavity and pharynx",
+                      "Other and unspecified parts of mouth",
+                      "Other and unspecified parts of tongue")
+larhypopharynx.class <- c("Hypopharynx", "Larynx")
+
+def.loc <- clin %>%
+  select(file_id.BAM, file_id.expression, primary_site) %>%
+  mutate(LocClass = case_when(primary_site %in% oropharynx.class ~ "Oropharynx",
+                              primary_site %in% oralcavity.class ~ "OralCavity",
+                              primary_site %in% larhypopharynx.class ~
+                                "LarynxHypopharynx")) %>%
+  filter(!is.na(LocClass))
+
+exora <- exora %>%
+  filter(sample %in% def.loc$file_id.BAM)
 ```
 
 # Format
@@ -56,9 +81,8 @@ identical(colnames(count.matrices[[1]]), colnames(count.matrices[[2]]))
 ```{r manipulate clinical data}
 meta <- BHscores %>%
   rename("sample" = "file_id.expression") %>%
-  left_join(clin) %>%
+  inner_join(def.loc) %>%
   mutate(sample = file_id.BAM) %>%
-  select(sample, file_id.expression, buffa.score) %>%
   inner_join(HPVstatus) %>%
   mutate(buffa.tert = case_when(buffa.score < quantile(buffa.score, .3333) ~ 0,
                                  buffa.score > quantile(buffa.score, .6666) ~ 1),
@@ -71,6 +95,15 @@ meta <- countmat.ord %>%
   
 identical(meta$sample, colnames(count.matrices[[1]]))
 
+```
+
+# Note mean buffa per location group
+
+```{r}
+meta %>%
+  group_by(LocClass) %>%
+  summarise(mean.buffa = mean(buffa.score),
+            sd.buffa = sqrt(var(buffa.score)))
 ```
 
 # DESeq
@@ -137,3 +170,75 @@ table.res %>%
   spread(key = "HPV", value = "n") 
 ```
 
+# Repeat for multivariate, location classes
+
+```{r}
+capture.models.univ <- function(outcome, lfun, modin){
+  mods.list <- lapply(mics, function(x) try({glm(as.formula(paste0(outcome, " ~ `", x, "`")), family = lfun, data = modin) %>%
+                        tidy()})
+                      )
+                      
+  mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+  mods.df <- bind_rows(mods.list.clean)
+  return(mods.df)
+}
+
+capture.models.multi <- function(outcome, lfun, inters, modin){
+  mods.list <- lapply(mics, function(x) try({glm(as.formula(paste0(outcome, " ~ `", x, "` + ", inters)), family = lfun, data = modin) %>%
+      tidy() %>%
+      mutate(microbe = x)})
+  )
+  
+  mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+  mods.df <- bind_rows(mods.list.clean)
+  return(mods.df)
+}
+```
+
+## Formatting
+
+```{r}
+allmics.data  <- bind_rows(lapply(BH.mats, 
+                                  function(x) rownames_to_column(x,var = "taxa"))) %>%
+  gather(-taxa, key = "sample", value = "RA") %>%
+  spread(key = taxa, value = RA)
+
+BH.in <- meta.BH %>%
+  left_join(allmics.data)
+
+mics <- colnames(allmics.data[,-1])
+
+OC.in <- BH.in %>%
+  filter(LocClass == "OralCavity")
+OP.in <- BH.in %>%
+  filter(LocClass == "Oropharynx")
+LH.in <- BH.in %>%
+  filter(LocClass == "LarynxHypopharynx")
+```
+## Single variable location classes
+
+```{r, warning=FALSE}
+OC.res <- capture.models.univ("buffa.tert", "binomial", OC.in) %>%
+  filter(term != "(Intercept)")
+OP.res <- capture.models.univ("buffa.tert", "binomial", OP.in) %>%
+  filter(term != "(Intercept)")
+LH.res <- capture.models.univ("buffa.tert", "binomial", LH.in) %>%
+  filter(term != "(Intercept)")
+```
+
+## Multi variable location classes
+
+```{r, warning=FALSE}
+OP.mult <- capture.models.multi("buffa.tert", "binomial", "HPV.prev", OP.in) %>%
+  filter(grepl("HPV", term))
+```
+
+## Save results
+
+```{r}
+write.csv(OC.res, "../data/modelling_binom_OralCavity.csv", row.names = F)
+write.csv(OP.res, "../data/modelling_binom_Oropharynx.csv", row.names = F)
+write.csv(LH.res, "../data/modelling_binom_LarynxHypopharinx.csv", row.names = F)
+
+write.csv(OP.mult, "../data/modelling_binom_inter_Oropharynx.csv", row.names = F)
+```
