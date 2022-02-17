@@ -1,5 +1,5 @@
 ---
-title: "table 1 - ASCO"
+title: "table 1 - ASTRO"
 author: "Caroline Wheeler"
 date: "2/4/2022"
 output: html_document
@@ -32,7 +32,7 @@ buffa <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/hnsc_buffa.csv") %>%
 
 clin <- merge(clin, buffa)
 
-hpv <- read.csv("/users/PAS1695/whee57/Github/exohnsc/exploratory/data/HPV-prevalence-per-sample.csv") %>%
+hpv <- read.csv("../data/HPV-prevalence-per-sample.csv") %>%
   rename("file_id.BAM" = sample) %>%
   mutate("HPV present" = ifelse(HPV.prev == 1, "Yes", "No"))
     
@@ -102,7 +102,7 @@ tab
 ```
 
 ```{r}
-write.csv(tab, "/users/PAS1695/whee57/Github/exohnsc/exploratory/data/table1.csv")
+write.csv(tab, "../data/table1.csv")
 ```
 
 
