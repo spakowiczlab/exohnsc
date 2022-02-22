@@ -103,6 +103,8 @@ tab
 
 ```{r}
 write.csv(tab, "../data/table1.csv")
+
+write.csv(clin, "../data/table1_cleaned-source.csv")
 ```
 
 
