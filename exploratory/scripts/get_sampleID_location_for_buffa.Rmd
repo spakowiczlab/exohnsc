@@ -1,0 +1,47 @@
+---
+title: "make location table for buffa fig"
+author: "Caroline Wheeler"
+date: "4/27/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+```
+
+```{r}
+clin <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-15-2021/7-15-2021_tcga_clinical.csv", 
+                 stringsAsFactors = F) %>%
+  select(primary_site, submitter_id.x)
+```
+
+# Define HSNC locations
+```{r}
+oropharynx.class <- c("Base of tongue", "Oropharynx", "Palate", "Tonsil")
+oralcavity.class <- c("Floor of mouth", "Gum", "Lip",
+                      "Other and ill-defined sites in lip, oral cavity and pharynx",
+                      "Other and unspecified parts of mouth",
+                      "Other and unspecified parts of tongue")
+larhypopharynx.class <- c("Hypopharynx", "Larynx")
+
+def.loc <- clin %>%
+  mutate(LocClass = case_when(primary_site %in% oropharynx.class ~ "Oropharynx",
+                              primary_site %in% oralcavity.class ~ "Oral Cavity",
+                              primary_site %in% larhypopharynx.class ~
+                                "Larynx/Hypopharynx")) %>%
+  filter(!is.na(LocClass)) %>%
+  mutate(sampleID = substr(submitter_id.x, 1, 12))
+
+# change '-' to '.' and add .01 at the end 
+def.loc <- def.loc %>%
+  mutate(sampleID = paste(gsub("-", ".", sampleID), ".01")) %>%
+  select(LocClass, sampleID)
+```
+
+```{r}
+write.csv(def.loc, "../data/location.csv")
+```
+
+

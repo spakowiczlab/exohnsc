@@ -98,6 +98,8 @@ exora.p.hist <- exora.p.hist %>%
 Plot
 ```{r}
 exora.p.hist <- exora.p.hist[order(exora.p.hist$buffa.score),]
+exora.p.hist <- exora.p.hist %>%
+  
 
 g <- exora.p.hist %>% 
   ggplot(aes(x = sample, y = ra, fill = phylum)) +
