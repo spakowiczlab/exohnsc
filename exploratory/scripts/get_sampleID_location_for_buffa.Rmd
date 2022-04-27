@@ -13,8 +13,7 @@ library(tidyverse)
 
 ```{r}
 clin <- read.csv("/fs/ess/PAS1695/projects/HNSC/data/drake-output/7-15-2021/7-15-2021_tcga_clinical.csv", 
-                 stringsAsFactors = F) %>%
-  select(primary_site, submitter_id.x)
+                 stringsAsFactors = F) 
 ```
 
 # Define HSNC locations
@@ -36,7 +35,7 @@ def.loc <- clin %>%
 
 # change '-' to '.' and add .01 at the end 
 def.loc <- def.loc %>%
-  mutate(sampleID = paste(gsub("-", ".", sampleID), ".01")) %>%
+  mutate(sampleID = paste0(gsub("-", ".", sampleID), ".01")) %>%
   select(LocClass, sampleID)
 ```
 
