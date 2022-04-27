@@ -1,0 +1,89 @@
+---
+title: "buffa-all cancers"
+author: "Caroline Wheeler"
+date: "4/26/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(colorspace)
+library(scales)
+source("00-paths.R")
+```
+
+read in R object w/ buffa scores for all cancer and HNSC location 
+```{r}
+comb <- readRDS(file.path(paths$mitoscore, "/data/buffa-mitophagy_tcga-cancer.RData"))
+loc <- read.csv("../data/location.csv")
+
+comb <- merge(comb, loc, by="sampleID", all = T) %>%
+  select(-X) %>%
+  mutate(LocClass = ifelse(is.na(LocClass), "Other", LocClass))
+```
+
+```{r}
+mean.buffa <- 
+  comb %>%
+  group_by(cancer) %>%
+  summarize(mean = mean(BUFFA_HYPOXIA_SCORE)) %>%
+  mutate(`Buffa Category` = if_else(mean > 0,
+                             true = "HB",
+                             false = "LB")) %>%
+  mutate(cancer = fct_reorder(cancer, mean))
+```
+
+```{r}
+comb.ord <- 
+  comb %>%
+  left_join(mean.buffa) %>%
+  mutate(cancer = fct_reorder(cancer, -mean))
+
+comb.ord %>%
+  ggplot(aes(y = BUFFA_HYPOXIA_SCORE, x = cancer)) +
+  gghalves::geom_half_point(
+    aes(color = LocClass),
+    range_scale = .4, 
+    ## add some transparency
+    alpha = .3,
+    side = "l",
+    show.legend = FALSE
+  ) +
+  gghalves::geom_half_boxplot(
+    aes(
+      # color = cancer,
+      color = LocClass,
+    ),
+    side = "l",
+    width = 0.3,
+    show.legend = FALSE
+  ) +
+  ggdist::stat_halfeye(
+    aes(
+      color = LocClass,
+      fill = after_scale(lighten(color, .5))
+    ),
+    shape = 18,
+    point_size = 3,
+    interval_size = 1.8,
+    adjust = .5,
+    .width = c(0, 1),
+    show.legend = FALSE
+  ) +
+  theme_bw() +
+  coord_flip() +
+  #scale_color_viridis_d() +
+  scale_color_manual(values = c(muted("rosybrown"), "cornflowerblue", "yellow3" ,"gray50")) +
+  labs(y = "Buffa Hypoxia Score",
+       x = "")
+ggsave("../figures/buffa-cancer-raincloud.png",
+      height = 7, width = 5)
+#ggsave("../figures/buffa-cancer-raincloud.svg",
+#       height = 7, width = 5)
+```
+
+
+
+
