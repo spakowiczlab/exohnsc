@@ -57,23 +57,25 @@ comb.ord %>%
     alpha = .3,
     side = "l",
     show.legend = FALSE,
+    position = position_jitter()
   ) +
   facet_grid(vars(resize), scales = "free") +
-  gghalves::geom_half_boxplot(
-    aes(
-      # color = cancer,
-      color = LocClass
-    ),
-    side = "l",
-    width = 0.3,
-    show.legend = FALSE,
-  ) +
+  # gghalves::geom_half_boxplot(
+  #   aes(
+  #     # color = cancer,
+  #     color = LocClass
+  #   ),
+  #   side = "l",
+  #   width = 0.3,
+  #   show.legend = FALSE
+  # ) +
   ggdist::stat_halfeye(
     aes(
       color = LocClass,
       fill = after_scale(lighten(color, .5))
     ),
     shape = 18,
+    alpha = .5,
     point_size = 3,
     interval_size = 1.8,
     adjust = .5,
