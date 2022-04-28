@@ -16,11 +16,11 @@ library(scales)
 
 read in data
 ```{r}
-or <- read.csv("../exploratory/data/modelling_binom_Oropharynx.csv")
+or <- read.csv("../data/modelling_binom_Oropharynx.csv")
 or$location <- "OR"
-oc <- read.csv("../exploratory/data/modelling_binom_OralCavity.csv")
+oc <- read.csv("../data/modelling_binom_OralCavity.csv")
 oc$location <- "OC"
-lh <- read.csv("../exploratory/data/modelling_binom_LarynxHypopharinx.csv")
+lh <- read.csv("../data/modelling_binom_LarynxHypopharinx.csv")
 lh$location <- "LH"
 
 combo <- rbind(or, oc, lh)
@@ -37,7 +37,7 @@ combo <- combo %>%
 
 ```{r}
 combo <- combo %>%
-  mutate(new.estimate = ifelse(estimate > 0, log(estimate), log(abs(estimate))*-1))
+  mutate('log(estimate)' = ifelse(estimate > 0, log(estimate), log(abs(estimate))*-1))
 ```
 point to highlight
 ```{r}
@@ -46,16 +46,17 @@ highlight_df <- combo %>% filter(p.adjusted < 1)
 
 plot 
 ```{r fig.height=5, fig.width=6}
-ggplot(data=combo,aes(x= new.estimate, y=-log10(p.value), label=label, color=location)) + 
+ggplot(data=combo,aes(x= `estimate`, y=-log10(p.value), label=label, color=location)) + 
   geom_point() + 
   theme_bw() + 
   geom_text_repel(color=muted("slategray3")) + 
-  scale_color_manual(values = c("rosybrown", "slategray3", "antiquewhite3")) +
+  scale_color_manual(values = alpha(c("rosybrown", "slategray3", "yellow3"), .3)) +
   geom_point(data=highlight_df, 
-             aes(x=new.estimate,y=-log10(p.value)), 
+             aes(x=`estimate`,y=-log10(p.value)), 
              color=muted("slategray3"))
 
-ggsave("../exploratory/figures/fig1_volcano.png", dpi=400, device = "png", width = 6 , height = 5)
+#ggsave("../figures/fig1_volcano_log(estimate).png", dpi=400, device = "png", width = 6 , height = 5)
+ggsave("../figures/fig1_volcano.png", dpi=400, device = "png", width = 6 , height = 5)
 ```
 
 
