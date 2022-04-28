@@ -21,7 +21,9 @@ loc <- read.csv("../data/location.csv")
 
 comb <- merge(comb, loc, by="sampleID", all = T) %>%
   select(-X) %>%
-  mutate(LocClass = ifelse(is.na(LocClass), "Other", LocClass))
+  mutate(LocClass = ifelse(is.na(LocClass), "Other", LocClass)) %>%
+  filter(!is.na(cancer)) %>%
+  filter(!(cancer == "HNSC" & LocClass == "Other"))
 ```
 
 ```{r}
@@ -39,26 +41,32 @@ mean.buffa <-
 comb.ord <- 
   comb %>%
   left_join(mean.buffa) %>%
-  mutate(cancer = fct_reorder(cancer, -mean))
+  mutate(cancer = fct_reorder(cancer, -mean),
+         resize = ifelse(cancer == "HNSC", "HNSC", "OTher"))
+```
 
+
+```{r}
 comb.ord %>%
   ggplot(aes(y = BUFFA_HYPOXIA_SCORE, x = cancer)) +
+  scale_x_discrete(limits = rev) +
   gghalves::geom_half_point(
     aes(color = LocClass),
     range_scale = .4, 
     ## add some transparency
     alpha = .3,
     side = "l",
-    show.legend = FALSE
+    show.legend = FALSE,
   ) +
+  facet_grid(vars(resize), scales = "free") +
   gghalves::geom_half_boxplot(
     aes(
       # color = cancer,
-      color = LocClass,
+      color = LocClass
     ),
     side = "l",
     width = 0.3,
-    show.legend = FALSE
+    show.legend = FALSE,
   ) +
   ggdist::stat_halfeye(
     aes(
@@ -73,11 +81,14 @@ comb.ord %>%
     show.legend = FALSE
   ) +
   theme_bw() +
+  theme(
+    panel.border = element_blank(),
+    strip.text = element_blank()) +
   coord_flip() +
   #scale_color_viridis_d() +
   scale_color_manual(values = c(muted("rosybrown"), "cornflowerblue", "yellow3" ,"gray50")) +
   labs(y = "Buffa Hypoxia Score",
-       x = "")
+       x = "") 
 ggsave("../figures/buffa-cancer-raincloud.png",
       height = 7, width = 5)
 #ggsave("../figures/buffa-cancer-raincloud.svg",
