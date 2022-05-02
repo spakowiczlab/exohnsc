@@ -28,34 +28,37 @@ combo <- rbind(or, oc, lh)
 
 Try adjusting p-value
 ```{r}
+# need to round p.values close to 1 but not quite equal to 1
+combo$round <- signif(combo$p.value, 6)
+
 combo <- combo %>%
   mutate(p.adjusted = p.adjust(p.value),
-         label = ifelse(p.adjusted < 1, term, ""))
+         label = ifelse((p.value < 0.001 & estimate < -.5), term, "")) %>%
+    filter(p.value < 0.98)
+
 
 # only 2 significant p-values, all others are 1. Use un-adjusted p.value to plot.
 ```
 
-```{r}
-combo <- combo %>%
-  mutate('log(estimate)' = ifelse(estimate > 0, log(estimate), log(abs(estimate))*-1))
-```
 point to highlight
 ```{r}
-highlight_df <- combo %>% filter(p.adjusted < 1)
+highlight_df <- combo %>% filter(p.value < 0.001 & estimate < -.5)
 ```
 
 plot 
 ```{r fig.height=5, fig.width=6}
-ggplot(data=combo,aes(x= `estimate`, y=-log10(p.value), label=label, color=location)) + 
+ggplot(data=combo,aes(x= estimate, y=-log10(p.value), label=label, color=location)) + 
   geom_point() + 
   theme_bw() + 
   geom_text_repel(color=muted("slategray3")) + 
   scale_color_manual(values = alpha(c("rosybrown", "slategray3", "yellow3"), .3)) +
   geom_point(data=highlight_df, 
-             aes(x=`estimate`,y=-log10(p.value)), 
-             color=muted("slategray3"))
+             aes(x=estimate, y=-log10(p.value)), 
+             color=muted("slategray3")) +
+  geom_vline(xintercept=c(-.5, .5), linetype="dotted") +
+geom_hline(yintercept=3, linetype="dotted")
+  
 
-#ggsave("../figures/fig1_volcano_log(estimate).png", dpi=400, device = "png", width = 6 , height = 5)
 ggsave("../figures/fig1_volcano.png", dpi=400, device = "png", width = 6 , height = 5)
 ```
 
