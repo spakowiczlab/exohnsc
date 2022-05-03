@@ -59,3 +59,41 @@ combo.sig %>%
 ggsave("../figures/fig1_effectsize_top3.png", width = 6, height = 4)
 ```
 
+# check some relevant microbes
+
+```{r}
+mics <- c("`s__Staphylococcus aureus`", "f__Papillomaviridae", "`s__Human gammaherpesvirus 4`", "`s__Candida albicans`", "`s__Helicobacter pylori`", "`s__Porphyromonas gingivalis`", "`s__Streptomyces katrae`", "`s__Streptomyces albus`")
+
+combo.sig <- combo %>%
+  filter(term %in% mics)
+
+combo.sig %>%
+  ggplot(aes(x=estimate,
+             y=reorder(term,estimate),
+             fill=location)) + 
+  geom_bar(stat = "identity") + 
+  theme_bw() + 
+  #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
+  ylab("Microbe Classification") +
+  scale_fill_manual(values = c("rosybrown", "slategray3", "yellow3")) 
+ 
+```
+```{r}
+mics <- c("`s__Candidatus Thiodictyon syntrophicum`", "`s__Theileria orientalis`", "`s__Betaproteobacteria bacterium GR16-43`", "	
+`s__Streptococcus pyogenes`", "`s__Streptomyces katrae`", "`s__Streptomyces albus`")
+
+combo.sig <- combo %>%
+  filter(term %in% mics)
+
+combo.sig %>%
+  ggplot(aes(x=estimate,
+             y=reorder(term,estimate),
+             fill=location)) + 
+  geom_bar(stat = "identity") + 
+  theme_bw() + 
+  #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
+  ylab("Microbe Classification") +
+  scale_fill_manual(values = c("rosybrown", "slategray3", "yellow3")) 
+ 
+```
+

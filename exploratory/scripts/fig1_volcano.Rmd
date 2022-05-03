@@ -50,13 +50,14 @@ plot
 ggplot(data=combo,aes(x= estimate, y=-log10(p.value), label=label, color=location)) + 
   geom_point() + 
   theme_bw() + 
-  geom_text_repel(color=muted("slategray3")) + 
+  theme(text = element_text(size = 20)) +
+  geom_text_repel(color=muted("slategray3"), size = 8) + 
   scale_color_manual(values = alpha(c("rosybrown", "slategray3", "yellow3"), .3)) +
   geom_point(data=highlight_df, 
              aes(x=estimate, y=-log10(p.value)), 
              color=muted("slategray3")) +
   geom_vline(xintercept=c(-.5, .5), linetype="dotted") +
-geom_hline(yintercept=3, linetype="dotted")
+geom_hline(yintercept=3, linetype="dotted") 
   
 
 ggsave("../figures/fig1_volcano.png", dpi=400, device = "png", width = 6 , height = 5)
