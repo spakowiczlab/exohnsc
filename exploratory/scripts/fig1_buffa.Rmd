@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(colorspace)
 library(scales)
+library(svglite)
 source("00-paths.R")
 ```
 
@@ -45,34 +46,20 @@ comb.ord <-
          resize = ifelse(cancer == "HNSC", "HNSC", "OTher"))
 ```
 
-
 ```{r}
 comb.ord %>%
-  ggplot(aes(y = BUFFA_HYPOXIA_SCORE, x = cancer)) +
+  ggplot(aes(x = cancer, y = BUFFA_HYPOXIA_SCORE)) +
+  
   scale_x_discrete(limits = rev) +
-  gghalves::geom_half_point(
-    aes(color = LocClass),
-    range_scale = .4, 
-    ## add some transparency
-    alpha = .3,
-    side = "l",
-    show.legend = FALSE,
-  ) +
+  
   facet_grid(vars(resize), scales = "free") +
-  gghalves::geom_half_boxplot(
-    aes(
-      # color = cancer,
-      color = LocClass
-    ),
-    side = "l",
-    width = 0.3,
-    show.legend = FALSE,
-  ) +
-  ggdist::stat_halfeye(
+  
+    ggdist::stat_halfeye(
     aes(
       color = LocClass,
       fill = after_scale(lighten(color, .5))
     ),
+    position = position_nudge(x = .2, y = 0),
     shape = 18,
     point_size = 3,
     interval_size = 1.8,
@@ -80,21 +67,72 @@ comb.ord %>%
     .width = c(0, 1),
     show.legend = FALSE
   ) +
+  
+  geom_point(
+    aes(color = LocClass),
+    position = position_jitter(width = .15,),
+    size = 1,
+    alpha = .5
+  ) +
+
   theme_bw() +
   theme(
     panel.border = element_blank(),
-    strip.text = element_blank()) +
+    strip.text = element_blank(),
+   panel.spacing = unit(0, "lines")) +
   coord_flip() +
-  #scale_color_viridis_d() +
   scale_color_manual(values = c(muted("rosybrown"), "cornflowerblue", "yellow3" ,"gray50")) +
   labs(y = "Buffa Hypoxia Score",
        x = "") 
-ggsave("../figures/buffa-cancer-raincloud.png",
-      height = 7, width = 5)
-#ggsave("../figures/buffa-cancer-raincloud.svg",
-#       height = 7, width = 5)
+
+ggsave("../figures/fig1_buffa-cancer-raincloud.png",
+     height = 7, width = 6)
+ggsave("../figures/fig1_buffa-cancer-raincloud.svg",
+      height = 7, width = 6)
 ```
+```{r}
+comb.ord %>%
+  ggplot(aes(x = cancer, y = BUFFA_HYPOXIA_SCORE)) +
+  
+  scale_x_discrete(limits = rev) +
+  
+  facet_grid(vars(resize), scales = "free") +
+  
+    geom_point(
+    aes(color = LocClass),
+    position = position_jitter(width = .15,),
+    size = 1,
+    alpha = .5
+  ) +
+  
+    ggdist::stat_halfeye(
+    aes(
+      fill = LocClass
+    ),
+    position = position_nudge(x = .2, y = 0),
+    shape = 18,
+    alpha = .5,
+    point_size = 3,
+    interval_size = 1.8,
+    adjust = .5,
+    .width = c(0, 1),
+    show.legend = FALSE
+  ) +
+  
+  theme_bw() +
+  theme(
+    panel.border = element_blank(),
+    strip.text = element_blank(),
+   panel.spacing = unit(0, "lines")) +
+  coord_flip() +
+  scale_color_manual(values = c(muted("rosybrown"), "cornflowerblue", "yellow3" ,"gray50")) +
+  scale_fill_manual(values = c("rosybrown", "cornflowerblue", "yellow3" ,"gray50")) +
+  labs(y = "Buffa Hypoxia Score",
+       x = "") 
 
-
-
+ggsave("../figures/fig1_buffa-cancer-raincloud_v2.png",
+     height = 7, width = 6)
+ggsave("../figures/fig1_buffa-cancer-raincloud_v2.svg",
+      height = 7, width = 6)
+```
 

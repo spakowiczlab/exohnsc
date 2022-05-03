@@ -92,8 +92,9 @@ combo.sig %>%
   geom_bar(stat = "identity") + 
   theme_bw() + 
   #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
-  ylab("Microbe Classification") +
+  ylab("") +
   scale_fill_manual(values = c("rosybrown", "slategray3", "yellow3")) 
- 
+
+ggsave("../figures/fig1_effectsize_selectmics.png", width = 6, height = 4)
 ```
 
