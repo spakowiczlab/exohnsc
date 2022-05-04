@@ -9,16 +9,17 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
+library(svglite)
 ```
 
 read in data
 ```{r}
 or <- read.csv("../data/modelling_binom_Oropharynx.csv")
-or$location <- "OR"
+or$Location <- "OPx"
 oc <- read.csv("../data/modelling_binom_OralCavity.csv")
-oc$location <- "OC"
+oc$Location <- "OC"
 lh <- read.csv("../data/modelling_binom_LarynxHypopharinx.csv")
-lh$location <- "LH"
+lh$Location <- "LHPx"
 
 combo <- rbind(or, oc, lh)
 ```
@@ -37,7 +38,7 @@ combo.sig %>%
   ylab("Microbe Classification") +
   scale_fill_manual(values = c("slategray3")) 
  
-ggsave("../figures/fig1_effectsize_top10.png", width = 6, height = 4)
+#ggsave("../figures/fig1_effectsize_top10.png", width = 6, height = 4)
 ```
 top 3 lowest p.values from each site
 ```{r}
@@ -56,7 +57,7 @@ combo.sig %>%
   ylab("Microbe Classification") +
   scale_fill_manual(values = c("rosybrown", "slategray3", "yellow3")) 
  
-ggsave("../figures/fig1_effectsize_top3.png", width = 6, height = 4)
+#ggsave("../figures/fig1_effectsize_top3.png", width = 6, height = 4)
 ```
 
 # check some relevant microbes
@@ -91,10 +92,44 @@ combo.sig %>%
              fill=location)) + 
   geom_bar(stat = "identity") + 
   theme_bw() + 
+  theme(
+    text = element_text(size = 14)
+  ) +
   #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
   ylab("") +
   scale_fill_manual(values = c("rosybrown", "slategray3", "yellow3")) 
 
+#ggsave("../figures/fig1_effectsize_selectmics.png", width = 8, height = 4)
+```
+Microbes from abstract + some
+```{r}
+mic_OC <- c("`s__Pseudomonas sp. RU47`", "`s__Pseudomonas sp. M30-35`", "`s__Pseudomonas mandelii`", "`s__Pseudomonas mandelii`", "`s__Pseudomonas frederiksbergensis`", "`s__Pseudomonas libanensis`", "`s__Porphyromonas gingivalis`")
+
+mic_LH <- c("`s__Filifactor alocis`", "`s__Helicobacter pylori`")
+
+mic_OP <- c("`s__Actinomyces naeslundii`", "`s__Actinomyces sp. oral taxon 414`", "`s__Actinomyces sp. 2129`", "`s__Sulfurimonas gotlandica`", "`s__Sulfurimonas sp. 1-1N`")
+
+combo.sig <- combo %>%
+  filter((term %in% mic_OC & Location == "OC") | (term %in% mic_LH & Location == "LHPx") | (term %in% mic_OP & Location == "OPx"))
+
+# remove '' and s_ from term
+combo.sig <- combo.sig %>%
+  mutate(term = substr(term, 5, nchar(term)-1))
+
+combo.sig %>%
+  ggplot(aes(x=estimate,
+             y=reorder(term,estimate),
+             fill=Location)) + 
+  geom_bar(stat = "identity") + 
+  theme_bw() + 
+  theme(
+    text = element_text(size = 14)
+  ) +
+  ylab("") +
+  xlab("Effect Size") +
+  scale_fill_manual(values = c("rosybrown", "slategray3", "yellow3")) 
+
 ggsave("../figures/fig1_effectsize_selectmics.png", width = 6, height = 4)
+ggsave("../figures/fig1_effectsize_selectmics.svg", width = 6, height = 4)
 ```
 

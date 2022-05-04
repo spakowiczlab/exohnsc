@@ -12,16 +12,17 @@ library(tidyverse)
 library(ggplot2)
 library(ggrepel)
 library(scales)
+library(svglite)
 ```
 
 read in data
 ```{r}
 or <- read.csv("../data/modelling_binom_Oropharynx.csv")
-or$location <- "OR"
+or$location <- "OPx"
 oc <- read.csv("../data/modelling_binom_OralCavity.csv")
 oc$location <- "OC"
 lh <- read.csv("../data/modelling_binom_LarynxHypopharinx.csv")
-lh$location <- "LH"
+lh$location <- "LHPx"
 
 combo <- rbind(or, oc, lh)
 ```
@@ -50,8 +51,7 @@ plot
 ggplot(data=combo,aes(x= estimate, y=-log10(p.value), label=label, color=location)) + 
   geom_point() + 
   theme_bw() + 
-  theme(text = element_text(size = 20)) +
-  geom_text_repel(color=muted("slategray3"), size = 8) + 
+  geom_text_repel(color=muted("slategray3"), size = 4) + 
   scale_color_manual(values = alpha(c("rosybrown", "slategray3", "yellow3"), .3)) +
   geom_point(data=highlight_df, 
              aes(x=estimate, y=-log10(p.value)), 
@@ -61,6 +61,7 @@ geom_hline(yintercept=3, linetype="dotted")
   
 
 ggsave("../figures/fig1_volcano.png", dpi=400, device = "png", width = 6 , height = 5)
+ggsave("../figures/fig1_volcano.svg", dpi=400, device = "svg", width = 6 , height = 5)
 ```
 
 
