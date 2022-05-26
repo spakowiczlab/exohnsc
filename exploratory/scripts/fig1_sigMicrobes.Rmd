@@ -28,15 +28,15 @@ Top 10 lowest p.values
 ```{r}
 combo.sig <- head(arrange(combo, (p.value)), n=10)
   
-combo.sig %>%
-  ggplot(aes(x=estimate,
-             y=reorder(term,estimate),
-             fill=location)) + 
-  geom_bar(stat = "identity") + 
-  theme_bw() + 
-  #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
-  ylab("Microbe Classification") +
-  scale_fill_manual(values = c("slategray3")) 
+# combo.sig %>%
+#   ggplot(aes(x=estimate,
+#              y=reorder(term,estimate),
+#              fill=location)) + 
+#   geom_bar(stat = "identity") + 
+#   theme_bw() + 
+#   #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
+#   ylab("Microbe Classification") +
+#   scale_fill_manual(values = c("slategray3")) 
  
 #ggsave("../figures/fig1_effectsize_top10.png", width = 6, height = 4)
 ```
@@ -48,9 +48,9 @@ lh.sig <- head(arrange(lh, (p.value)), n=3)
 combo.sig <- rbind(or.sig, oc.sig, lh.sig)
   
 combo.sig %>%
-  ggplot(aes(x=estimate,
-             y=reorder(term,estimate),
-             fill=location)) + 
+  ggplot(aes(x = estimate,
+             y = reorder(term, estimate),
+             fill = location)) + 
   geom_bar(stat = "identity") + 
   theme_bw() + 
   #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
@@ -71,7 +71,7 @@ combo.sig <- combo %>%
 combo.sig %>%
   ggplot(aes(x=estimate,
              y=reorder(term,estimate),
-             fill=location)) + 
+             fill=Location)) + 
   geom_bar(stat = "identity") + 
   theme_bw() + 
   #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
@@ -90,7 +90,7 @@ combo.sig <- combo %>%
 combo.sig %>%
   ggplot(aes(x=estimate,
              y=reorder(term,estimate),
-             fill=location)) + 
+             fill=Location)) + 
   geom_bar(stat = "identity") + 
   theme_bw() + 
   theme(
@@ -148,7 +148,7 @@ combo.sig %>%
   ggplot(aes(x=estimate,
              y=reorder(term,estimate),
              fill=Location)) + 
-  geom_bar(stat = "identity") + 
+  geom_bar(stat = "identity", show.legend = FALSE) + 
   facet_grid(. ~Location) +
   theme_bw() + 
   theme(
