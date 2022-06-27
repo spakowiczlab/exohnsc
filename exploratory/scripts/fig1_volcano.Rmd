@@ -49,7 +49,7 @@ highlight_df <- combo %>% filter(p.value < 0.01 & (estimate < -.5 | estimate > .
 plot faceted volcano
 ```{r fig.height=5, fig.width=6}
 ggplot(data=combo,aes(x= estimate, y=-log10(p.value), label=label, color=Location)) + 
-  facet_grid(. ~ Location, scales = "free", space = "free") +
+  facet_grid(. ~ Location, scales = "free") +
   geom_point() + 
   theme_bw() + 
   geom_text_repel(color="black",size = 2.5, max.overlaps = 30) + 
@@ -67,8 +67,8 @@ ggplot(data=combo,aes(x= estimate, y=-log10(p.value), label=label, color=Locatio
   geom_hline(yintercept=2, linetype="dotted") 
   
 
-ggsave("../figures/fig1_volcano_faceted.png", dpi=400, device = "png", width = 8 , height = 5)
-#ggsave("../figures/fig1_volcano.svg", dpi=400, device = "svg", width = 6 , height = 5)
+ggsave("../figures/fig1_volcano_faceted.png", dpi=400, device = "png", width = 8 , height = 7)
+ggsave("../figures/fig1_volcano_faceted.svg", dpi=400, device = "svg", width = 8 , height = 7)
 ```
 
 # ```{r}
