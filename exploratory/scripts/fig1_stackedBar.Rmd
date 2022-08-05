@@ -77,6 +77,7 @@ large.phyls <- exora.p %>%
   mutate(x = row_number()) %>%
   dplyr::filter(x <= 7)
 large.phyls <- large.phyls$phylum
+
 tmp <- exora.p %>% arrange(desc(ra))
 sampord.orter <- tmp$sample
 ```
@@ -97,8 +98,23 @@ exora.p.hist <- exora.p.hist %>%
 
 Plot
 ```{r}
-exora.p.hist <- exora.p.hist[order(exora.p.hist$buffa.score),]
-exora.p.hist$phylum <- factor(exora.p.hist$phylum, levels = c("Actinobacteria", "Apicomplexa", "Caudovirales", "Firmicutes", "Ortervirales", "Proteobacteria", "Streptophyta", "Other"))
+proteo <- exora.p.hist %>%
+  filter(phylum == "Proteobacteria") %>%
+  rename(proteo_ra = "ra") %>%
+  select(sample, proteo_ra)
+
+proteo <- proteo[order(proteo$proteo_ra),]
+
+plotOrder <- proteo$sample
+
+exora.p.hist <- merge(proteo, exora.p.hist)
+
+exora.p.hist <- exora.p.hist %>%
+  mutate(sample = fct_reorder(sample, desc(proteo_ra)))
+
+#exora.p.hist <- exora.p.hist[order(exora.p.hist$proteo),]
+
+exora.p.hist$phylum <- factor(exora.p.hist$phylum, levels = c("Proteobacteria", "Actinobacteria", "Apicomplexa", "Caudovirales", "Firmicutes", "Ortervirales", "Streptophyta", "Other"))
 
 g <- exora.p.hist %>% 
   ggplot(aes(x = sample, y = ra, fill = phylum)) +
@@ -120,6 +136,7 @@ g <- exora.p.hist %>%
 g
 
 ggsave(g, file = "../figures/fig1_stackedbar.png", dev = "png", width = 7, height = 6)
+ggsave(g, file = "../figures/fig1_stackedbar.svg", dev = "svg", width = 7, height = 6)
 ```
 
 

@@ -28,15 +28,15 @@ Top 10 lowest p.values
 ```{r}
 combo.sig <- head(arrange(combo, (p.value)), n=10)
   
-combo.sig %>%
-  ggplot(aes(x=estimate,
-             y=reorder(term,estimate),
-             fill=location)) + 
-  geom_bar(stat = "identity") + 
-  theme_bw() + 
-  #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
-  ylab("Microbe Classification") +
-  scale_fill_manual(values = c("slategray3")) 
+# combo.sig %>%
+#   ggplot(aes(x=estimate,
+#              y=reorder(term,estimate),
+#              fill=location)) + 
+#   geom_bar(stat = "identity") + 
+#   theme_bw() + 
+#   #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
+#   ylab("Microbe Classification") +
+#   scale_fill_manual(values = c("slategray3")) 
  
 #ggsave("../figures/fig1_effectsize_top10.png", width = 6, height = 4)
 ```
@@ -48,9 +48,9 @@ lh.sig <- head(arrange(lh, (p.value)), n=3)
 combo.sig <- rbind(or.sig, oc.sig, lh.sig)
   
 combo.sig %>%
-  ggplot(aes(x=estimate,
-             y=reorder(term,estimate),
-             fill=location)) + 
+  ggplot(aes(x = estimate,
+             y = reorder(term, estimate),
+             fill = location)) + 
   geom_bar(stat = "identity") + 
   theme_bw() + 
   #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
@@ -71,7 +71,7 @@ combo.sig <- combo %>%
 combo.sig %>%
   ggplot(aes(x=estimate,
              y=reorder(term,estimate),
-             fill=location)) + 
+             fill=Location)) + 
   geom_bar(stat = "identity") + 
   theme_bw() + 
   #ggtitle("Effect Size BRB vs. NMBA - Significant Taxa") +
@@ -79,6 +79,7 @@ combo.sig %>%
   scale_fill_manual(values = c("rosybrown", "slategray3", "yellow3")) 
  
 ```
+
 ```{r}
 mics <- c("`s__Candidatus Thiodictyon syntrophicum`", "`s__Theileria orientalis`", "`s__Betaproteobacteria bacterium GR16-43`", "	
 `s__Streptococcus pyogenes`", "`s__Streptomyces katrae`", "`s__Streptomyces albus`")
@@ -89,7 +90,7 @@ combo.sig <- combo %>%
 combo.sig %>%
   ggplot(aes(x=estimate,
              y=reorder(term,estimate),
-             fill=location)) + 
+             fill=Location)) + 
   geom_bar(stat = "identity") + 
   theme_bw() + 
   theme(
@@ -129,7 +130,54 @@ combo.sig %>%
   xlab("Effect Size") +
   scale_fill_manual(values = c("rosybrown", "slategray3", "yellow3")) 
 
-ggsave("../figures/fig1_effectsize_selectmics.png", width = 6, height = 4)
-ggsave("../figures/fig1_effectsize_selectmics.svg", width = 6, height = 4)
+ggsave("../figures/fig1_effectsize_selectmics.png", width = 10, height = 4)
+#ggsave("../figures/fig1_effectsize_selectmics.svg", width = 6, height = 4)
 ```
+
+```{r}
+mics <- c("`s__Pseudomonas sp. RU47`", "`s__Pseudomonas sp. M30-35`", "`s__Pseudomonas mandelii`", "`s__Pseudomonas mandelii`", "`s__Pseudomonas frederiksbergensis`", "`s__Pseudomonas libanensis`", "`s__Porphyromonas gingivalis`", "`s__Filifactor alocis`", "`s__Helicobacter pylori`", "`s__Actinomyces naeslundii`", "`s__Actinomyces sp. oral taxon 414`", "`s__Actinomyces sp. 2129`", "`s__Sulfurimonas gotlandica`", "`s__Sulfurimonas sp. 1-1N`")
+
+combo.sig <- combo %>%
+  filter(term %in% mics)
+
+# remove '' and s_ from term
+combo.sig <- combo.sig %>%
+  mutate(term = substr(term, 5, nchar(term)-1))
+
+combo.sig %>%
+  ggplot(aes(x=estimate,
+             y=reorder(term,estimate),
+             fill=Location)) + 
+  geom_bar(stat = "identity", show.legend = FALSE) + 
+  facet_grid(. ~Location) +
+  theme_bw() + 
+  theme(
+    text = element_text(size = 14)
+  ) +
+  ylab("") +
+  xlab("Effect Size") +
+  scale_fill_manual(values = c("rosybrown", "slategray3", "yellow3")) 
+
+ggsave("../figures/fig1_effectsize_selectmics.png", width = 10, height = 4)
+ggsave("../figures/fig1_effectsize_selectmics.svg", width = 10, height = 4)
+```
+
+
+check sig in multiple locations
+```{r}
+combo.sig <- combo %>%
+    filter(p.value < 0.05)
+
+n_occur <- data.frame(table(combo.sig$term)) %>%
+  filter(Freq == 3)
+
+combo.sig <- combo.sig %>%
+  filter(term %in% n_occur$Var1) %>%
+  select(term, estimate) %>%
+  group_by(term) %>%
+  summarize(sum(estimate))
+
+write.csv(combo.sig, "../data/sigMultipleLocations.csv")
+```
+
 

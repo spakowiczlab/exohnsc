@@ -1,0 +1,82 @@
+---
+title: "check-ORIEN-data-files"
+author: "Dan Spakowicz"
+date: "5/12/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# File check
+Compare the SLids between the clinical data and datafiles to ensure we have everything.
+
+```{r cars}
+data.dir <- "/fs/ess/PAS1695/projects/exohnsc/data"
+list.files(data.dir)
+```
+
+```{r}
+mdrr <- readxl::read_xlsx(file.path(data.dir, 
+                                    "Molecular Data Release Request TCC00212-KARI.xlsx"
+                                    )
+                          )
+
+head(mdrr)
+dim(mdrr)
+```
+
+
+```{r}
+unmapped <- list.files(path = file.path(data.dir, 
+                                        "20220509_OSTOR_files", 
+                                        "RNAseq",
+                                        "alignment_crams"),
+                       pattern = "*Unmapped.*mate1.gz$")
+head(unmapped)
+
+u.slid <- gsub("^(S.*)\\.Unmapped.*", "\\1", unmapped)
+
+head(u.slid)
+```
+
+```{r}
+u.slid %in% mdrr$`RNA-Tumor SL ID`
+```
+
+Are there any missing SLids in the mdrr file?
+
+```{r}
+is.na(mdrr$`RNA-Tumor SL ID`)
+
+```
+
+Which SLids in the mdrr file are missing from the "unmapped" SLids?
+```{r}
+mdrr$`RNA-Tumor SL ID`[!mdrr$`RNA-Tumor SL ID` %in% u.slid]
+```
+
+What about the SLids in the `fastq` file?
+
+```{r}
+fastq <- list.files(path = file.path(data.dir, 
+                                        "20220509_OSTOR_files", 
+                                        "RNAseq",
+                                        "fastq"),
+                    pattern = ".*_1.fastq.gz$")
+fastq
+```
+
+
+```{r}
+f.slid <- gsub("^(S.*)_1.fastq.gz", "\\1", fastq)
+
+f.slid
+```
+
+```{r}
+f.slid %in% mdrr$`RNA-Tumor SL ID`
+f.slid %in% u.slid
+```
+
