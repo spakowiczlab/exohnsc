@@ -43,8 +43,17 @@ comb.ord <-
   comb %>%
   left_join(mean.buffa) %>%
   mutate(cancer = fct_reorder(cancer, -mean),
-         resize = ifelse(cancer == "HNSC", "HNSC", "OTher"))
+         resize = ifelse(cancer == "HNSC", "HNSC", "Other"))
 ```
+
+```{r}
+table_data <- comb.ord %>%
+  select(BUFFA_HYPOXIA_SCORE, LocClass) %>%
+  group_by(LocClass) %>%
+  summarize(mean = mean(BUFFA_HYPOXIA_SCORE),
+            sd = sd(BUFFA_HYPOXIA_SCORE))
+```
+
 
 ```{r}
 comb.ord %>%
@@ -82,7 +91,7 @@ comb.ord %>%
    panel.spacing = unit(0, "lines")) +
   coord_flip() +
   scale_color_manual(values = c(muted("rosybrown"), "cornflowerblue", "yellow3" ,"gray50")) +
-  labs(y = "Buffa Hypoxia Score",
+  labs(y = "Hypoxia Score",
        x = "") 
 
 ggsave("../figures/fig1_buffa-cancer-raincloud.png",
