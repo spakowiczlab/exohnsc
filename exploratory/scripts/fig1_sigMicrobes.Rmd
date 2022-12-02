@@ -130,7 +130,7 @@ combo.sig %>%
   xlab("Effect Size") +
   scale_fill_manual(values = c("rosybrown", "slategray3", "yellow3")) 
 
-ggsave("../figures/fig1_effectsize_selectmics.png", width = 10, height = 4)
+#ggsave("../figures/fig1_effectsize_selectmics.png", width = 10, height = 4)
 #ggsave("../figures/fig1_effectsize_selectmics.svg", width = 6, height = 4)
 ```
 
@@ -158,8 +158,8 @@ combo.sig %>%
   xlab("Effect Size") +
   scale_fill_manual(values = c("rosybrown", "slategray3", "yellow3")) 
 
-ggsave("../figures/fig1_effectsize_selectmics.png", width = 10, height = 4)
-ggsave("../figures/fig1_effectsize_selectmics.svg", width = 10, height = 4)
+#ggsave("../figures/fig1_effectsize_selectmics.png", width = 10, height = 4)
+#ggsave("../figures/fig1_effectsize_selectmics.svg", width = 10, height = 4)
 ```
 
 

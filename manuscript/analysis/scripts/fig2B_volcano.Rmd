@@ -1,0 +1,78 @@
+---
+title: "volcano"
+author: "Caroline Wheeler"
+date: "4/18/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(ggplot2)
+library(ggrepel)
+library(scales)
+library(svglite)
+```
+
+read in data
+```{r}
+or <- read.csv("../data/modelling_binom_Oropharynx.csv")
+or$Location <- "OPx"
+oc <- read.csv("../data/modelling_binom_OralCavity.csv")
+oc$Location <- "OC"
+lh <- read.csv("../data/modelling_binom_LarynxHypopharinx.csv")
+lh$Location <- "LHPx"
+
+combo <- rbind(or, oc, lh)
+```
+
+Try adjusting p-value
+```{r}
+# need to round p.values close to 1 but not quite equal to 1
+combo$round <- signif(combo$p.value, 6)
+
+combo <- combo %>%
+  mutate(p.adjusted = p.adjust(p.value),
+         label = ifelse((p.value < 0.01 & (estimate < -.5 | estimate > .5)), term, "")) %>%
+    filter(p.value < 0.98)
+
+
+# only 2 significant p-values, all others are 1. Use un-adjusted p.value to plot.
+```
+
+point to highlight
+```{r}
+highlight_df <- combo %>% filter(p.value < 0.01 & (estimate < -.5 | estimate > .5))
+```
+
+plot faceted volcano
+```{r fig.height=5, fig.width=6}
+ggplot(data=combo,aes(x= estimate, y=-log10(p.value), label=label, color=Location)) + 
+
+  #facet_grid(. ~ Location, scales = "free") +
+  #geom_point() + 
+
+  facet_grid(. ~ Location, scales = "free", space = "free") +
+  geom_point(show.legend = FALSE) + 
+
+  theme_bw() + 
+  geom_text_repel(color="black",size = 2.5, max.overlaps = 30) + 
+  scale_color_manual(values = alpha(c("rosybrown", "slategray3", "yellow3"), .3)) +
+  geom_point(data = highlight_df %>% filter(Location == "LHPx"),
+             aes(x=estimate, y=-log10(p.value)),
+                 color=muted("rosybrown")) + 
+  geom_point(data = highlight_df %>% filter(Location == "OC"),
+             aes(x=estimate, y=-log10(p.value)),
+                 color=muted("slategray3")) + 
+  geom_point(data = highlight_df %>% filter(Location == "OPx"),
+             aes(x=estimate, y=-log10(p.value)),
+                 color=muted("yellow3")) + 
+  geom_vline(xintercept=c(-.5, .5), linetype="dotted") +
+  geom_hline(yintercept=2, linetype="dotted") +
+  labs(x = "Effect Size",
+       y = "-log(p-value)")
+
+ggsave("../figures/fig1_volcano_faceted.png", dpi=400, device = "png", width = 8 , height = 7)
+#ggsave("../figures/fig1_volcano_faceted.svg", dpi=400, device = "svg", width = 8 , height = 7)
+```

@@ -49,13 +49,13 @@ highlight_df <- combo %>% filter(p.value < 0.01 & (estimate < -.5 | estimate > .
 plot faceted volcano
 ```{r fig.height=5, fig.width=6}
 ggplot(data=combo,aes(x= estimate, y=-log10(p.value), label=label, color=Location)) + 
-<<<<<<< HEAD
-  facet_grid(. ~ Location, scales = "free") +
-  geom_point() + 
-=======
+
+  #facet_grid(. ~ Location, scales = "free") +
+  #geom_point() + 
+
   facet_grid(. ~ Location, scales = "free", space = "free") +
   geom_point(show.legend = FALSE) + 
->>>>>>> 9f5ac02b84e6c7c98a12660a68ebdba75db9c53a
+
   theme_bw() + 
   geom_text_repel(color="black",size = 2.5, max.overlaps = 30) + 
   scale_color_manual(values = alpha(c("rosybrown", "slategray3", "yellow3"), .3)) +
@@ -73,8 +73,8 @@ ggplot(data=combo,aes(x= estimate, y=-log10(p.value), label=label, color=Locatio
   labs(x = "Effect Size",
        y = "-log(p-value)")
 
-ggsave("../figures/fig1_volcano_faceted.png", dpi=400, device = "png", width = 8 , height = 7)
-ggsave("../figures/fig1_volcano_faceted.svg", dpi=400, device = "svg", width = 8 , height = 7)
+#ggsave("../figures/fig1_volcano_faceted.png", dpi=400, device = "png", width = 8 , height = 7)
+#ggsave("../figures/fig1_volcano_faceted.svg", dpi=400, device = "svg", width = 8 , height = 7)
 ```
 
 ```{r}
