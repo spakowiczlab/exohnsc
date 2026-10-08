@@ -44,3 +44,4 @@ rarefied-prevalence_all-TCGA-samps.csv
 # paths description files
 exohnsc.json
 scripts/00-paths.R
+.DS_Store
